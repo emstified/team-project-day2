@@ -15,18 +15,27 @@ import {
   Sparkles,
   ExternalLink,
   X,
+  ChevronDown,
+  KeyRound,
 } from "lucide-react";
 
 interface RamenFinderViewProps {
   savedShopIds: string[];
   onToggleSaveShop: (shop: RamenShopRecord) => void;
   onOpenTrails: () => void;
+  onConnectOAuth?: () => void;
+  oauthConnecting?: boolean;
 }
+
+const PAGE_STEP = 12;
+const MCP_MAX_LIMIT = 50;
 
 export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
   savedShopIds,
   onToggleSaveShop,
   onOpenTrails,
+  onConnectOAuth,
+  oauthConnecting = false,
 }) => {
   const [prefFilter, setPrefFilter] = useState("ALL");
   const [keitoFilter, setKeitoFilter] = useState("ALL");
@@ -36,16 +45,28 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
   const [lateNightOnly, setLateNightOnly] = useState(false);
 
   const [shops, setShops] = useState<RamenShopRecord[]>([]);
+  const [totalMatched, setTotalMatched] = useState<number>(0);
+  const [isLiveMcp, setIsLiveMcp] = useState<boolean>(false);
+  const [warningMessage, setWarningMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState("");
   const [dataAsOf, setDataAsOf] = useState("2026-10-01");
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Pagination / Load More state
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE_STEP);
 
   // Selected shop for get_ramen_shop dossier modal
   const [selectedShop, setSelectedShop] = useState<RamenShopRecord | null>(null);
   const [shopDetailLoading, setShopDetailLoading] = useState(false);
+  const [shopDetailWarning, setShopDetailWarning] = useState<string | null>(null);
+  const [shopDetailIsLive, setShopDetailIsLive] = useState<boolean>(false);
 
   useEffect(() => {
     let cancelled = false;
+    setVisibleCount(PAGE_STEP);
+
     const fetchRamen = async () => {
       setLoading(true);
       try {
@@ -57,16 +78,39 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
           q: searchQuery,
           ic_card: String(icCardOnly),
           late_night: String(lateNightOnly),
+          limit: String(MCP_MAX_LIMIT),
+          offset: "0",
         });
         const res = await fetch(`/api/ramen.js?${params.toString()}`);
         const data = await res.json();
         if (!cancelled) {
-          setShops(data.shops || []);
+          const fetchedShops: RamenShopRecord[] = Array.isArray(data.shops)
+            ? data.shops
+            : [];
+          setShops(fetchedShops);
+          setTotalMatched(
+            typeof data.total_matched === "number"
+              ? data.total_matched
+              : fetchedShops.length
+          );
+          setIsLiveMcp(Boolean(data.isLiveMcp));
+          setWarningMessage(data.warning || null);
+          setErrorMessage(data.error || null);
           setDataSource(data.source || "");
           setDataAsOf(data.data_as_of || "2026-10-01");
         }
-      } catch (_e) {
-        // ignore
+      } catch (err) {
+        if (!cancelled) {
+          setIsLiveMcp(false);
+          setErrorMessage(
+            err instanceof Error
+              ? err.message
+              : "Network error while requesting /api/ramen.js"
+          );
+          setWarningMessage(
+            "Unable to retrieve live data from /api/ramen.js. Check server connection."
+          );
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -84,9 +128,57 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
     lateNightOnly,
   ]);
 
+  const handleLoadMore = async () => {
+    // If we already fetched up to 50 shops in memory and visibleCount < shops.length, reveal the next batch
+    if (visibleCount < shops.length) {
+      setVisibleCount((prev) => Math.min(prev + PAGE_STEP, shops.length));
+      return;
+    }
+
+    // If the server indicates total_matched > shops.length, request the next offset page
+    if (totalMatched > shops.length && !loadingMore) {
+      setLoadingMore(true);
+      try {
+        const params = new URLSearchParams({
+          action: "search",
+          pref: prefFilter,
+          keito: keitoFilter,
+          status: statusFilter,
+          q: searchQuery,
+          ic_card: String(icCardOnly),
+          late_night: String(lateNightOnly),
+          limit: String(MCP_MAX_LIMIT),
+          offset: String(shops.length),
+        });
+        const res = await fetch(`/api/ramen.js?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          const moreShops: RamenShopRecord[] = Array.isArray(data.shops)
+            ? data.shops
+            : [];
+          if (moreShops.length > 0) {
+            setShops((prev) => {
+              const seen = new Set(prev.map((s) => s.id));
+              const uniqueAdditions = moreShops.filter((m) => !seen.has(m.id));
+              const combined = [...prev, ...uniqueAdditions];
+              setVisibleCount(combined.length);
+              return combined;
+            });
+          }
+        }
+      } catch (_e) {
+        // ignore pagination error
+      } finally {
+        setLoadingMore(false);
+      }
+    }
+  };
+
   const handleInspectShopDossier = async (shop: RamenShopRecord) => {
     setSelectedShop(shop);
     setShopDetailLoading(true);
+    setShopDetailWarning(null);
+    setShopDetailIsLive(isLiveMcp);
     try {
       const res = await fetch(
         `/api/ramen.js?action=shop&id=${encodeURIComponent(shop.id)}`
@@ -96,6 +188,8 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
         if (data.shop) {
           setSelectedShop(data.shop);
         }
+        setShopDetailIsLive(Boolean(data.isLiveMcp));
+        setShopDetailWarning(data.warning || null);
       }
     } catch (_e) {
       // keep initial shop record
@@ -103,6 +197,9 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
       setShopDetailLoading(false);
     }
   };
+
+  const displayedShops = shops.slice(0, visibleCount);
+  const canLoadMoreInMemory = visibleCount < shops.length;
 
   return (
     <div className="space-y-12 pb-10">
@@ -208,8 +305,10 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-stone-100 pb-4">
           <div>
             <p className="text-xs font-mono text-stone-500">
-              MCP Tool: <span className="text-stone-800 font-semibold">search_ramen</span> ·{" "}
-              {dataSource}
+              MCP Tool: <span className="text-stone-800 font-semibold">search_ramen (limit=50)</span> ·{" "}
+              <span className={isLiveMcp ? "text-emerald-700 font-semibold" : "text-amber-700 font-semibold"}>
+                {dataSource}
+              </span>
             </p>
             <h2 className="font-serif-display text-2xl font-semibold text-stone-900 mt-0.5">
               Nationwide Verified Ramen Shop Explorer
@@ -219,6 +318,59 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
             Freshness Stamp: <span className="text-stone-900 font-medium">data_as_of {dataAsOf}</span>
           </p>
         </div>
+
+        {/* Requirement 8: Explicit Warning / Error Banner when live MCP data cannot be retrieved */}
+        {(!isLiveMcp || warningMessage || errorMessage) && (
+          <div
+            role="status"
+            className="p-4 rounded-xl bg-amber-50 border border-amber-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950"
+          >
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="font-semibold text-amber-900">
+                  Fallback Reference Mode Active — Live MCP Data Not Retrieved
+                </p>
+                <p className="text-amber-800 leading-relaxed">
+                  {warningMessage ||
+                    errorMessage ||
+                    "Live MCP server (https://server.smithery.ai/eng213035/gachi-ramen) is not yet authenticated. Showing explicitly labelled fallback reference records."}
+                </p>
+              </div>
+            </div>
+            {onConnectOAuth && (
+              <button
+                type="button"
+                onClick={onConnectOAuth}
+                disabled={oauthConnecting}
+                className="min-h-[38px] px-3.5 py-2 text-xs font-medium bg-[#B93829] hover:bg-[#9E2E21] text-white rounded-xl transition-colors flex items-center gap-1.5 shrink-0 self-start sm:self-center"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>
+                  {oauthConnecting
+                    ? "Connecting MCP..."
+                    : "Authorize Live MCP Server"}
+                </span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {isLiveMcp && (
+          <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-between gap-3 text-xs text-emerald-950">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span>
+                <strong>Live MCP Connected:</strong> Displaying real-time results from{" "}
+                <code className="font-mono">https://server.smithery.ai/eng213035/gachi-ramen</code>{" "}
+                (up to 50 shops per query).
+              </span>
+            </div>
+            <span className="font-mono font-semibold text-emerald-900 shrink-0">
+              Total Matched: {totalMatched.toLocaleString()}
+            </span>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
           {/* Nationwide Text Search (q) */}
@@ -233,7 +385,7 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="e.g., Hachigo, Shinjuku, Hakata, Niboshi, Scallop..."
+                placeholder="e.g., Ichiran, Hachigo, Shinjuku, Hakata, Niboshi..."
                 className="w-full min-h-[44px] pl-10 pr-3.5 py-2 text-sm bg-[#F8F7F4] border border-stone-300 rounded-xl text-stone-900"
               />
             </div>
@@ -257,6 +409,10 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
               <option value="Kyoto">Kyoto (京都府)</option>
               <option value="Osaka">Osaka (大阪府)</option>
               <option value="Chiba">Chiba / Matsudo (千葉県)</option>
+              <option value="Saitama">Saitama (埼玉県)</option>
+              <option value="Kanagawa">Kanagawa / Yokohama (神奈川県)</option>
+              <option value="Aichi">Aichi / Nagoya (愛知県)</option>
+              <option value="Hiroshima">Hiroshima (広島県)</option>
               <option value="Okinawa">Okinawa / Yaeyama (沖縄県)</option>
             </select>
           </div>
@@ -274,7 +430,7 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
             >
               <option value="ALL">All Broth Styles (Keito)</option>
               <option value="shoyu">Shoyu (Soy Sauce &amp; Niboshi)</option>
-              <option value="tonkotsu">Tonkotsu (Pork Bone / Hakata)</option>
+              <option value="tonkotsu">Tonkotsu (Pork Bone / Hakata / Iekei)</option>
               <option value="miso">Miso (Sapporo Wok-Fired)</option>
               <option value="shio">Shio (Clear Sea Salt, Kelp &amp; Scallop)</option>
               <option value="tsukemen">Tsukemen (Rich Dipping Noodles)</option>
@@ -359,16 +515,54 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
       </section>
 
       {/* Results Grid */}
-      <section aria-label="Matched Ramen Shops" className="space-y-4">
-        <div className="flex items-center justify-between text-xs text-stone-500 px-1">
-          <span>
-            Showing <strong className="text-stone-900">{shops.length}</strong> verified ramen counters
-          </span>
+      <section aria-label="Matched Ramen Shops" className="space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-stone-600 px-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span>
+              Showing{" "}
+              <strong className="text-stone-900 tabular-nums">
+                {displayedShops.length}
+              </strong>{" "}
+              of{" "}
+              <strong className="text-stone-900 tabular-nums">
+                {shops.length}
+              </strong>{" "}
+              loaded shops
+              {totalMatched > shops.length && (
+                <>
+                  {" "}
+                  (out of{" "}
+                  <strong className="text-[#B93829] tabular-nums">
+                    {totalMatched.toLocaleString()}
+                  </strong>{" "}
+                  total matching shops in MCP database)
+                </>
+              )}
+              {totalMatched > 0 && totalMatched === shops.length && (
+                <>
+                  {" "}
+                  · Total Matching Shops:{" "}
+                  <strong className="text-stone-900 tabular-nums">
+                    {totalMatched.toLocaleString()}
+                  </strong>
+                </>
+              )}
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded font-mono text-[11px] ${
+                isLiveMcp
+                  ? "bg-emerald-100 text-emerald-900 font-semibold"
+                  : "bg-amber-100 text-amber-900 font-semibold"
+              }`}
+            >
+              {isLiveMcp ? "LIVE MCP DATA" : "FALLBACK DATASET"}
+            </span>
+          </div>
           <span>Click any shop card to inspect full MCP record (get_ramen_shop)</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {shops.map((shop) => {
+          {displayedShops.map((shop) => {
             const isSaved = savedShopIds.includes(shop.id);
             const isClosed = shop.status === "closed_confirmed";
 
@@ -385,7 +579,9 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
                     <span className="font-medium text-stone-700">
                       {shop.pref} ({shop.pref_ja}) · {shop.neighborhood}
                     </span>
-                    <span className="font-mono text-stone-500">{shop.id}</span>
+                    <span className="font-mono text-stone-500">
+                      {shop.id} · {isLiveMcp ? "Live MCP" : "Fallback Ref"}
+                    </span>
                   </div>
 
                   {/* Shop Name & Lineage */}
@@ -499,6 +695,36 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
           })}
         </div>
 
+        {/* Requirement 4: Load More Pagination Controls */}
+        {canLoadMoreInMemory && (
+          <div className="pt-4 flex flex-col items-center justify-center space-y-2">
+            <button
+              type="button"
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="min-h-[44px] px-6 py-2.5 text-xs font-medium bg-stone-900 hover:bg-stone-800 text-white rounded-xl transition-colors flex items-center gap-2"
+            >
+              <ChevronDown className="w-4 h-4" />
+              <span>
+                {loadingMore
+                  ? "Loading More Ramen Shops..."
+                  : `Load More Ramen Shops (${displayedShops.length} of ${shops.length} shown)`}
+              </span>
+            </button>
+            {totalMatched > shops.length && (
+              <p className="text-[11px] font-mono text-stone-500">
+                Server matched {totalMatched.toLocaleString()} shops total (MCP server limit per call: 50). Narrow your search or prefecture to explore specific wards.
+              </p>
+            )}
+          </div>
+        )}
+
+        {!canLoadMoreInMemory && totalMatched > shops.length && (
+          <p className="text-center text-xs font-mono text-stone-500 pt-2">
+            Showing all {shops.length} shops returned by MCP server (server max limit=50 out of {totalMatched.toLocaleString()} total matches). Filter by city, station, or broth style to narrow results.
+          </p>
+        )}
+
         {!loading && shops.length === 0 && (
           <div className="bg-white border border-stone-200 rounded-2xl p-8 text-center space-y-3">
             <Soup className="w-8 h-8 text-stone-400 mx-auto" />
@@ -524,7 +750,8 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
             <div className="flex items-start justify-between gap-4 border-b border-stone-200 pb-4">
               <div>
                 <p className="text-xs font-mono text-[#B93829]">
-                  MCP Tool: get_ramen_shop · ID: {selectedShop.id}
+                  MCP Tool: get_ramen_shop · ID: {selectedShop.id} ·{" "}
+                  {shopDetailIsLive ? "LIVE MCP RECORD" : "FALLBACK REFERENCE"}
                 </p>
                 <h3 className="font-serif-display text-2xl font-semibold text-stone-900 mt-0.5">
                   {selectedShop.name_en}
@@ -547,6 +774,13 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
               <p className="text-xs font-mono text-stone-500">
                 Querying get_ramen_shop({selectedShop.id})...
               </p>
+            )}
+
+            {shopDetailWarning && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <span>{shopDetailWarning}</span>
+              </div>
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">

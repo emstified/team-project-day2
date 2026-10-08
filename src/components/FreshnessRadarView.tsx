@@ -23,6 +23,8 @@ export const FreshnessRadarView: React.FC<FreshnessRadarViewProps> = ({
   const [sinceDate, setSinceDate] = useState("2026-09-01");
   const [events, setEvents] = useState<RamenChangeEvent[]>([]);
   const [sourceLabel, setSourceLabel] = useState("");
+  const [changesWarning, setChangesWarning] = useState<string | null>(null);
+  const [isLiveChanges, setIsLiveChanges] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mcpConnectionReport, setMcpConnectionReport] = useState<Record<
     string,
@@ -41,6 +43,8 @@ export const FreshnessRadarView: React.FC<FreshnessRadarViewProps> = ({
         const changesData = await changesRes.json();
         setEvents(changesData.events || []);
         setSourceLabel(changesData.source || "");
+        setIsLiveChanges(Boolean(changesData.isLiveMcp));
+        setChangesWarning(changesData.warning || null);
       }
       if (mcpRes.ok) {
         const mcpData = await mcpRes.json();
@@ -104,6 +108,15 @@ export const FreshnessRadarView: React.FC<FreshnessRadarViewProps> = ({
       {/* Change Feed Cards */}
       <div className="space-y-4">
         <p className="text-xs font-mono text-stone-500">{sourceLabel}</p>
+        {(!isLiveChanges || changesWarning) && (
+          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+            <span>
+              {changesWarning ||
+                "Live MCP change feed not retrieved. Showing explicitly labelled fallback reference events."}
+            </span>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {events.map((ev) => {
             const badgeStyle =

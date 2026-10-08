@@ -366,6 +366,15 @@ export async function callSmitheryMcpTool(targetToolName, args = {}) {
     headers["mcp-session-id"] = sessionId;
   }
 
+  await fetch(MCP_ENDPOINT, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      method: "notifications/initialized",
+    }),
+  }).catch(() => {});
+
   let resolvedName = targetToolName;
   if (cachedDiscoveredTools.length > 0) {
     const match = cachedDiscoveredTools.find(

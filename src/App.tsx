@@ -227,6 +227,8 @@ export default function App() {
             savedShopIds={savedShopIds}
             onToggleSaveShop={handleToggleSaveShop}
             onOpenTrails={() => setActiveTab("trails")}
+            onConnectOAuth={handleConnectSmitheryOAuth}
+            oauthConnecting={oauthConnecting}
           />
         )}
 
