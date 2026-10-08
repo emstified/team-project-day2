@@ -3,7 +3,7 @@
 **GOAL:** Build a functional, mobile-responsive travel web application using my MCP toolkit only. Translate the business concept into a working MVP that delivers the proposed value to travellers, not just a visually attractive website.
 
 **OUTPUT:**
-1. **Assess the MCP toolkit** — only use end point: https://server.smithery.ai/eng213035/gachi-ramen
+1. **Assess the MCP toolkit** — only use end point: https://ramen.gachi-tokusuru.com/mcp
 2. **Define the MVP** — Prioritise must-have features and the core end-to-end user journey. do not include anything that is irrelevant to the end users. 
 3. **Design the application** — Create a modern, intuitive, mobile-first interface with responsive layouts, clear navigation, attractive travel imagery and consistent branding.
 4. **Build the application** — Implement working pages, navigation, forms, interactions, data handling and relevant MCP integrations from my end point only. Ensure the main user journey works from beginning to end.

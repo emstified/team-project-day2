@@ -74,9 +74,9 @@ export const FreshnessRadarView: React.FC<FreshnessRadarViewProps> = ({
           <p className="text-sm sm:text-base text-stone-600 mt-2 max-w-3xl leading-relaxed">
             Nothing ruins a ramen pilgrimage faster than walking 20 minutes to a shuttered shop.{" "}
             <code className="font-mono text-xs bg-stone-200/70 px-1.5 py-0.5 rounded">
-              eng213035/gachi-ramen
+              https://ramen.gachi-tokusuru.com/mcp
             </code>{" "}
-            audits 62,144 shops monthly to flag new openings, closure candidates, and web-confirmed closures with evidence URLs.
+            audits 67,464+ shops to flag new openings, closure candidates, and web-confirmed closures with evidence URLs.
           </p>
         </div>
 
@@ -189,26 +189,11 @@ export const FreshnessRadarView: React.FC<FreshnessRadarViewProps> = ({
               </h2>
             </div>
             <p className="text-xs font-mono text-stone-600">
-              Endpoint: https://server.smithery.ai/eng213035/gachi-ramen
+              Endpoint: https://ramen.gachi-tokusuru.com/mcp
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {!mcpAuthenticated && (
-              <button
-                type="button"
-                onClick={onConnectOAuth}
-                disabled={oauthConnecting}
-                className="min-h-[40px] px-3.5 py-2 text-xs font-medium bg-[#B93829] text-white rounded-xl hover:bg-[#9E2E21] transition-colors flex items-center gap-1.5"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>
-                  {oauthConnecting
-                    ? "Connecting OAuth..."
-                    : "Authorize gachi-ramen OAuth"}
-                </span>
-              </button>
-            )}
             <button
               type="button"
               onClick={() => setShowRawMcp(!showRawMcp)}
@@ -223,14 +208,14 @@ export const FreshnessRadarView: React.FC<FreshnessRadarViewProps> = ({
           <div className="p-3.5 bg-[#F8F7F4] rounded-xl">
             <p className="text-stone-500">Gateway Reachability</p>
             <p className="font-semibold text-stone-900 mt-0.5">
-              {mcpConnectionReport?.connected ? "Reachable (HTTP 200/401)" : "Checking..."} ·{" "}
+              {mcpConnectionReport?.connected ? "Connected (HTTP 200 OK)" : "Checking..."} ·{" "}
               <span className="font-mono">{String(mcpConnectionReport?.latencyMs || 0)}ms</span>
             </p>
           </div>
           <div className="p-3.5 bg-[#F8F7F4] rounded-xl">
             <p className="text-stone-500">Registered MCP Tools</p>
             <p className="font-mono font-semibold text-stone-900 mt-0.5">
-              search_ramen · get_ramen_shop · get_ramen_changes
+              ping · search_ramen · get_ramen_shop · get_ramen_changes · vibe_search
             </p>
           </div>
           <div className="p-3.5 bg-[#F8F7F4] rounded-xl">

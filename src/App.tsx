@@ -144,18 +144,23 @@ export default function App() {
   const handleLoadTrailIntoCrawl = async (trail: RamenPilgrimageTrail) => {
     setCrawlSavedNotice(false);
     try {
-      const res = await fetch("/api/ramen.js?action=search&pref=ALL&status=ALL");
-      if (res.ok) {
-        const data = await res.json();
-        const allShops = (data.shops || []) as RamenShopRecord[];
-        const matched = allShops.filter((s) => trail.shopIds.includes(s.id));
-        setSavedShops((prev) => {
-          const existingIds = new Set(prev.map((p) => p.id));
-          const additions = matched.filter((m) => !existingIds.has(m.id));
-          return [...prev, ...additions];
-        });
-        setCrawlDrawerOpen(true);
-      }
+      const results = await Promise.all(
+        trail.shopIds.map((id) =>
+          fetch(`/api/ramen.js?action=shop&id=${encodeURIComponent(id)}`).then((r) =>
+            r.json()
+          )
+        )
+      );
+      const matched = results
+        .map((r) => r?.shop as RamenShopRecord | undefined)
+        .filter((s): s is RamenShopRecord => Boolean(s));
+
+      setSavedShops((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id));
+        const additions = matched.filter((m) => !existingIds.has(m.id));
+        return [...prev, ...additions];
+      });
+      setCrawlDrawerOpen(true);
     } catch (_e) {
       setCrawlDrawerOpen(true);
     }
@@ -260,30 +265,16 @@ export default function App() {
             <span>
               Powered Exclusively by{" "}
               <code className="font-mono text-stone-700">
-                https://server.smithery.ai/eng213035/gachi-ramen
+                https://ramen.gachi-tokusuru.com/mcp
               </code>
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            {!mcpAuthenticated ? (
-              <button
-                type="button"
-                onClick={handleConnectSmitheryOAuth}
-                disabled={oauthConnecting}
-                className="min-h-[36px] px-3 py-1.5 text-xs font-medium text-stone-700 bg-[#F8F7F4] border border-stone-300 rounded-lg hover:bg-stone-100 transition-colors flex items-center gap-1.5"
-              >
-                <KeyRound className="w-3.5 h-3.5 text-[#B93829]" />
-                <span>
-                  {oauthConnecting
-                    ? "Connecting gachi-ramen..."
-                    : "Authorize Live gachi-ramen MCP"}
-                </span>
-              </button>
-            ) : (
-              <span className="text-emerald-800 font-medium">
-                Live MCP Connected (eng213035/gachi-ramen)
-              </span>
-            )}
+            <span className="text-emerald-800 font-medium">
+              {mcpAuthenticated
+                ? "Live MCP Connected (ramen.gachi-tokusuru.com/mcp)"
+                : "Checking MCP Connection..."}
+            </span>
             <a
               href="/api/mcp.js"
               target="_blank"

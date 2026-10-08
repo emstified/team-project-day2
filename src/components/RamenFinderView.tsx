@@ -209,7 +209,7 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
           <div className="lg:col-span-7 p-6 sm:p-10 lg:p-12 flex flex-col justify-between space-y-6 z-10">
             <div className="space-y-4">
               <p className="text-xs font-mono tracking-wider uppercase text-amber-300/90">
-                Powered by eng213035/gachi-ramen MCP · 62,144 Verified Shops · 47 Prefectures
+                Powered by https://ramen.gachi-tokusuru.com/mcp · 67,464 Verified Shops · 47 Prefectures
               </p>
               <h1 className="font-serif-display text-3xl sm:text-5xl font-semibold tracking-tight leading-[1.08] text-white">
                 Find Japan&rsquo;s Most Extraordinary Bowls—Without the Tourist Traps.
@@ -334,25 +334,10 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
                 <p className="text-amber-800 leading-relaxed">
                   {warningMessage ||
                     errorMessage ||
-                    "Live MCP server (https://server.smithery.ai/eng213035/gachi-ramen) is not yet authenticated. Showing explicitly labelled fallback reference records."}
+                    "Live MCP server (https://ramen.gachi-tokusuru.com/mcp) could not be reached. Showing explicitly labelled fallback reference records."}
                 </p>
               </div>
             </div>
-            {onConnectOAuth && (
-              <button
-                type="button"
-                onClick={onConnectOAuth}
-                disabled={oauthConnecting}
-                className="min-h-[38px] px-3.5 py-2 text-xs font-medium bg-[#B93829] hover:bg-[#9E2E21] text-white rounded-xl transition-colors flex items-center gap-1.5 shrink-0 self-start sm:self-center"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>
-                  {oauthConnecting
-                    ? "Connecting MCP..."
-                    : "Authorize Live MCP Server"}
-                </span>
-              </button>
-            )}
           </div>
         )}
 
@@ -362,7 +347,7 @@ export const RamenFinderView: React.FC<RamenFinderViewProps> = ({
               <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
               <span>
                 <strong>Live MCP Connected:</strong> Displaying real-time results from{" "}
-                <code className="font-mono">https://server.smithery.ai/eng213035/gachi-ramen</code>{" "}
+                <code className="font-mono">https://ramen.gachi-tokusuru.com/mcp</code>{" "}
                 (up to 50 shops per query).
               </span>
             </div>

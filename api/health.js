@@ -1,12 +1,11 @@
 /**
  * /api/health.js
- * Health monitor exclusively for https://server.smithery.ai/eng213035/gachi-ramen
+ * Health monitor for https://ramen.gachi-tokusuru.com/mcp
  */
 
 import {
   probeAndListMcpTools,
   MCP_ENDPOINT,
-  OAUTH_ISSUER,
   ATTACHED_MCP_SERVERS,
 } from "./mcpClient.js";
 
@@ -32,21 +31,15 @@ export async function checkMcpAndServicesHealth() {
       expectedTools: srv.tools,
       discoveredMatchingTools: matchedTools,
       description: srv.description,
-      status: probe.authenticated
-        ? "live_authenticated"
-        : probe.reachable
-        ? "reachable_oauth_ready"
-        : "unreachable",
-      dataMode: probe.authenticated
-        ? "Live MCP Execution (https://server.smithery.ai/eng213035/gachi-ramen)"
-        : "Verified Schema Reference Mode (Authorize OAuth for Live Queries)",
+      status: probe.reachable ? "live_connected" : "unreachable",
+      dataMode: probe.reachable
+        ? `Live MCP Execution (${MCP_ENDPOINT})`
+        : "Fallback Reference Mode (MCP Server Unreachable)",
     };
   });
 
-  const overallHealthy = probe.reachable && probe.oauthDiscovery.reachable;
-
   return {
-    status: overallHealthy ? "ok" : "degraded",
+    status: probe.reachable ? "ok" : "degraded",
     endpoint: MCP_ENDPOINT,
     timestamp: new Date().toISOString(),
     totalCheckDurationMs: Date.now() - startedAt,
@@ -55,21 +48,14 @@ export async function checkMcpAndServicesHealth() {
       reachable: probe.reachable,
       httpStatus: probe.httpStatus,
       authenticated: probe.authenticated,
-      hasTokenConfigured: probe.hasTokenConfigured,
       latencyMs: probe.latencyMs,
-      wwwAuthenticate: probe.wwwAuthenticate,
-      oauthDiscovery: probe.oauthDiscovery,
+      serverInfo: probe.serverInfo,
+      pingInfo: probe.pingInfo,
       discoveredToolsCount: discoveredNames.length,
       discoveredTools: discoveredNames,
       error: probe.error,
     },
     mcpServers: mcpServersStatus,
-    oauthReadiness: {
-      issuer: OAUTH_ISSUER,
-      dynamicClientRegistration: true,
-      pkceS256: true,
-      callbackPath: "/auth/callback",
-    },
   };
 }
 

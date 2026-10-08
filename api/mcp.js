@@ -1,23 +1,24 @@
 /**
  * /api/mcp.js
- * Checks the connection of the MCP server (https://server.smithery.ai/eng213035/gachi-ramen)
+ * Checks the connection of the MCP server (https://ramen.gachi-tokusuru.com/mcp)
  * and pulls data from its tools:
+ * - ping
  * - search_ramen
  * - get_ramen_shop
  * - get_ramen_changes
+ * - vibe_search
  */
 
 import {
   MCP_ENDPOINT,
-  MCP_WELL_KNOWN,
+  MCP_HOMEPAGE,
   ATTACHED_MCP_SERVERS,
   probeAndListMcpTools,
-  callSmitheryMcpTool,
-  getActiveToken,
+  callMcpTool,
 } from "./mcpClient.js";
 
 /**
- * Checks the connection and authentication state of https://server.smithery.ai/eng213035/gachi-ramen
+ * Checks the connection and live status of https://ramen.gachi-tokusuru.com/mcp
  */
 export async function checkMcpServerConnection() {
   const probe = await probeAndListMcpTools();
@@ -25,13 +26,12 @@ export async function checkMcpServerConnection() {
     connected: probe.reachable,
     authenticated: probe.authenticated,
     endpoint: MCP_ENDPOINT,
-    wellKnownUrl: MCP_WELL_KNOWN,
+    homepage: MCP_HOMEPAGE,
     httpStatus: probe.httpStatus,
     latencyMs: probe.latencyMs,
     checkedAt: probe.checkedAt,
-    hasTokenConfigured: Boolean(getActiveToken()),
-    wwwAuthenticate: probe.wwwAuthenticate,
-    oauthDiscovery: probe.oauthDiscovery,
+    serverInfo: probe.serverInfo,
+    pingInfo: probe.pingInfo,
     attachedServers: ATTACHED_MCP_SERVERS,
     discoveredTools: probe.tools,
     error: probe.error,
@@ -39,10 +39,10 @@ export async function checkMcpServerConnection() {
 }
 
 /**
- * Pulls data from https://server.smithery.ai/eng213035/gachi-ramen for a given tool and arguments.
+ * Pulls data from https://ramen.gachi-tokusuru.com/mcp for a given tool and arguments.
  */
 export async function pullDataFromMcpServer(toolName, args = {}) {
-  return await callSmitheryMcpTool(toolName, args);
+  return await callMcpTool(toolName, args);
 }
 
 export default async function handler(req, res) {
