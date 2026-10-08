@@ -169,9 +169,9 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
-              <span>Live Meteorological &amp; Seasonal Feed</span>
+              <span>Seasonal &amp; Weather Routing Engine</span>
               <span aria-hidden="true">·</span>
-              <span>{weatherData?.source || "Open-Meteo Live API"}</span>
+              <span>{weatherData?.source || "Smithery MCP / Simulated Seasonal Reference"}</span>
             </div>
             <h2 className="font-serif-display text-xl md:text-2xl font-semibold text-stone-900">
               Weather-Adaptive Itinerary Engine &amp; Foliage Tracker

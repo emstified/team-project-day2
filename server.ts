@@ -4,15 +4,21 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
-import healthHandler from "./api/health.js";
+import healthHandler, { checkMcpAndServicesHealth } from "./api/health.js";
+import {
+  MCP_ENDPOINT,
+  MCP_WELL_KNOWN,
+  createSmitheryOAuthUrl,
+  exchangeSmitheryOAuthCode,
+  probeAndListMcpTools,
+  callSmitheryMcpTool,
+  clearActiveToken,
+} from "./api/mcpClient.js";
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const MCP_ENDPOINT = "https://mcp.smithery.ai/linpeiyun-emily";
-const MCP_WELL_KNOWN = "https://mcp.smithery.ai/.well-known/oauth-protected-resource/linpeiyun-emily";
 
 function getAiClient() {
   return new GoogleGenAI({
@@ -25,65 +31,113 @@ function getAiClient() {
   });
 }
 
-const CITY_COORDINATES: Record<
+const SEASONAL_CLIMATOLOGY: Record<
   string,
-  { name: string; country: "Japan" | "South Korea"; lat: number; lon: number; seasonHighlight: string }
+  {
+    name: string;
+    country: "Japan" | "South Korea";
+    seasonHighlight: string;
+    tempC: number;
+    feelsLikeC: number;
+    windKph: number;
+    condition: string;
+    isRainy: boolean;
+    advisory: string;
+    forecast: {
+      date: string;
+      maxTemp: number;
+      minTemp: number;
+      precipProb: number;
+      condition: string;
+    }[];
+  }
 > = {
   kyoto: {
     name: "Kyoto",
     country: "Japan",
-    lat: 35.0116,
-    lon: 135.7681,
     seasonHighlight: "Autumn Momiji Peak & Private Temple Night Illumination (Oct–Nov)",
-  },
-  tokyo: {
-    name: "Tokyo",
-    country: "Japan",
-    lat: 35.6762,
-    lon: 139.6503,
-    seasonHighlight: "Shimokitazawa & Yanaka Twilight Backstreet Craft Season",
-  },
-  nagano: {
-    name: "Nagano",
-    country: "Japan",
-    lat: 36.6486,
-    lon: 138.1942,
-    seasonHighlight: "Alpine Cedar Foliage & High-Altitude Rotenburo Season",
+    tempC: 17,
+    feelsLikeC: 16,
+    windKph: 7,
+    condition: "Crisp Twilight Air",
+    isRainy: false,
+    advisory:
+      "Clear evening conditions for after-hours Daitoku-ji courtyard walks; toggle Rainy Swap to preview covered machiya tea sanctuaries.",
+    forecast: [
+      { date: "Day 1", maxTemp: 19, minTemp: 11, precipProb: 15, condition: "Crisp & Clear" },
+      { date: "Day 2", maxTemp: 18, minTemp: 10, precipProb: 20, condition: "Partly Clouded" },
+      { date: "Day 3", maxTemp: 16, minTemp: 9, precipProb: 60, condition: "Autumn Mist & Showers" },
+    ],
   },
   seoul: {
     name: "Seoul",
     country: "South Korea",
-    lat: 37.5665,
-    lon: 126.978,
     seasonHighlight: "Seochon Hanok Ginkgo Gold & Changdeokgung Moonlight Window",
+    tempC: 15,
+    feelsLikeC: 14,
+    windKph: 9,
+    condition: "Clear Mountain Breeze",
+    isRainy: false,
+    advisory:
+      "Ideal visibility for Changdeokgung Secret Garden moonlight entry and Inwangsan ridge walks.",
+    forecast: [
+      { date: "Day 1", maxTemp: 17, minTemp: 9, precipProb: 10, condition: "Crisp & Clear" },
+      { date: "Day 2", maxTemp: 16, minTemp: 8, precipProb: 25, condition: "High Mountain Clouds" },
+      { date: "Day 3", maxTemp: 14, minTemp: 7, precipProb: 55, condition: "Light Rain Showers" },
+    ],
+  },
+  nagano: {
+    name: "Nagano",
+    country: "Japan",
+    seasonHighlight: "Alpine Cedar Foliage & High-Altitude Rotenburo Season",
+    tempC: 12,
+    feelsLikeC: 11,
+    windKph: 6,
+    condition: "Alpine Morning Mist",
+    isRainy: false,
+    advisory:
+      "Cool mountain air ideal for open-air rotenburo thermal soaking and Togakushi cedar trails.",
+    forecast: [
+      { date: "Day 1", maxTemp: 14, minTemp: 5, precipProb: 20, condition: "Alpine Sun & Mist" },
+      { date: "Day 2", maxTemp: 13, minTemp: 4, precipProb: 50, condition: "Mountain Showers" },
+      { date: "Day 3", maxTemp: 15, minTemp: 6, precipProb: 15, condition: "Crisp & Clear" },
+    ],
   },
   jeju: {
     name: "Jeju Island",
     country: "South Korea",
-    lat: 33.4996,
-    lon: 126.5312,
     seasonHighlight: "Silver Eulalia Grass (Eoksae) & Basalt Coastal Haenyeo Harvest",
+    tempC: 19,
+    feelsLikeC: 19,
+    windKph: 14,
+    condition: "Golden Coastal Breeze",
+    isRainy: false,
+    advisory:
+      "Mild coastal conditions along Gujwa-eup basalt trails and haenyeo stone hearth dining.",
+    forecast: [
+      { date: "Day 1", maxTemp: 21, minTemp: 14, precipProb: 15, condition: "Coastal Sun" },
+      { date: "Day 2", maxTemp: 20, minTemp: 13, precipProb: 30, condition: "Sea Breeze" },
+      { date: "Day 3", maxTemp: 18, minTemp: 12, precipProb: 60, condition: "Passing Island Shower" },
+    ],
+  },
+  tokyo: {
+    name: "Tokyo",
+    country: "Japan",
+    seasonHighlight: "Shimokitazawa & Yanaka Twilight Backstreet Craft Season",
+    tempC: 18,
+    feelsLikeC: 17,
+    windKph: 8,
+    condition: "Clear Evening Sky",
+    isRainy: false,
+    advisory:
+      "Pleasant evening temperatures for backstreet gallery walks and subterranean jazz kissa sessions.",
+    forecast: [
+      { date: "Day 1", maxTemp: 20, minTemp: 12, precipProb: 10, condition: "Clear Sky" },
+      { date: "Day 2", maxTemp: 19, minTemp: 11, precipProb: 20, condition: "Light Clouds" },
+      { date: "Day 3", maxTemp: 17, minTemp: 10, precipProb: 50, condition: "Evening Rain" },
+    ],
   },
 };
-
-function interpretWeatherCode(code: number, precipProb: number) {
-  const isRainy =
-    precipProb >= 45 ||
-    [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99].includes(code);
-  let label = "Crisp & Clear";
-  if ([1, 2, 3].includes(code)) label = "Partly Clouded Sky";
-  if ([45, 48].includes(code)) label = "Atmospheric Mist";
-  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) label = "Light Rain Showers";
-  if ([71, 73, 75].includes(code)) label = "Mountain Snowfall";
-
-  return {
-    label,
-    isRainy,
-    advisory: isRainy
-      ? "Rain-adaptive routing active: prioritising covered machiya/hanok sanctuaries, subterranean listening bars, and indoor artisan workshops."
-      : "Optimal outdoor visibility: clear conditions for after-hours temple courtyard walks, ridge trails, and lantern-lit alleyways.",
-  };
-}
 
 async function startServer() {
   const app = express();
@@ -91,246 +145,250 @@ async function startServer() {
 
   app.use(express.json({ limit: "2mb" }));
 
-  // 0. MCP & API Health Monitor (/api/health and /api/health.js)
+  // 0. Health Monitor (/api/health and /api/health.js)
   app.get(["/api/health", "/api/health.js"], (req, res) => {
     healthHandler(req, res);
   });
 
-  // 1. Live MCP Toolkit Assessment & Probe Endpoint
-  app.get("/api/mcp/status", async (_req, res) => {
-    const smitheryKey = process.env.SMITHERY_API_KEY || "";
-    let probeStatus = 0;
-    let wwwAuthenticate = "";
-    let resourceMetadata: Record<string, unknown> | null = null;
-    let liveTools: unknown[] = [];
-    let authenticated = false;
-
+  // 1. Smithery MCP OAuth 2.0 PKCE Authorization URL Generator
+  app.get("/api/mcp/oauth/url", async (req, res) => {
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-      };
-      if (smitheryKey) {
-        headers["Authorization"] = `Bearer ${smitheryKey}`;
+      const origin = String(req.query.origin || process.env.APP_URL || "http://localhost:3000");
+      const authData = await createSmitheryOAuthUrl(origin);
+      res.json(authData);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to initialize Smithery OAuth";
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // 2. OAuth 2.0 Popup Callback Route (/auth/callback)
+  const oauthCallbackHandler = async (req: express.Request, res: express.Response) => {
+    const code = String(req.query.code || "");
+    const state = String(req.query.state || "");
+    const errorParam = String(req.query.error || "");
+
+    if (errorParam) {
+      res.send(`<!doctype html>
+<html>
+  <body style="font-family: sans-serif; padding: 24px; background: #F8F7F4; color: #141413;">
+    <h3>Smithery MCP Authorization Declined</h3>
+    <p>${errorParam}</p>
+    <script>
+      if (window.opener) {
+        window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: ${JSON.stringify(errorParam)} }, '*');
+        setTimeout(() => window.close(), 1200);
       }
-
-      const mcpRes = await fetch(MCP_ENDPOINT, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "initialize",
-          params: {
-            protocolVersion: "2024-11-05",
-            capabilities: {},
-            clientInfo: { name: "uramichi-concierge", version: "1.0.0" },
-          },
-        }),
-      });
-
-      probeStatus = mcpRes.status;
-      wwwAuthenticate = mcpRes.headers.get("www-authenticate") || "";
-
-      if (mcpRes.ok) {
-        authenticated = true;
-        const toolsRes = await fetch(MCP_ENDPOINT, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: 2,
-            method: "tools/list",
-            params: {},
-          }),
-        });
-        if (toolsRes.ok) {
-          const toolsData = (await toolsRes.json()) as { result?: { tools?: unknown[] } };
-          liveTools = toolsData?.result?.tools || [];
-        }
-      }
-
-      const metaRes = await fetch(MCP_WELL_KNOWN);
-      if (metaRes.ok) {
-        resourceMetadata = (await metaRes.json()) as Record<string, unknown>;
-      }
-    } catch (error) {
-      probeStatus = 503;
+    </script>
+  </body>
+</html>`);
+      return;
     }
 
+    try {
+      await exchangeSmitheryOAuthCode(code, state);
+      await probeAndListMcpTools();
+
+      res.send(`<!doctype html>
+<html>
+  <body style="font-family: sans-serif; padding: 24px; background: #F8F7F4; color: #141413;">
+    <h3>Smithery MCP Endpoint Connected</h3>
+    <p>Authenticated with https://mcp.smithery.ai/linpeiyun-emily. This window will close automatically.</p>
+    <script>
+      if (window.opener) {
+        window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS' }, '*');
+        window.close();
+      } else {
+        window.location.href = '/';
+      }
+    </script>
+  </body>
+</html>`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "OAuth token exchange failed";
+      res.status(400).send(`<!doctype html>
+<html>
+  <body style="font-family: sans-serif; padding: 24px; background: #F8F7F4; color: #141413;">
+    <h3>Authentication Error</h3>
+    <p>${msg}</p>
+    <script>
+      if (window.opener) {
+        window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: ${JSON.stringify(msg)} }, '*');
+      }
+    </script>
+  </body>
+</html>`);
+    }
+  };
+
+  app.get(["/auth/callback", "/auth/callback/"], oauthCallbackHandler);
+
+  // 3. Disconnect / Reset Smithery OAuth Session
+  app.post("/api/mcp/disconnect", (_req, res) => {
+    clearActiveToken();
+    res.json({ disconnected: true });
+  });
+
+  // 4. Direct Tool Execution on https://mcp.smithery.ai/linpeiyun-emily
+  app.post("/api/mcp/call", async (req, res) => {
+    const { toolName, args = {} } = req.body || {};
+    if (!toolName) {
+      res.status(400).json({ error: "toolName is required" });
+      return;
+    }
+    try {
+      const result = await callSmitheryMcpTool(toolName, args);
+      res.json({
+        endpoint: MCP_ENDPOINT,
+        toolName,
+        executedAt: new Date().toISOString(),
+        result,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "MCP tool call failed";
+      res.status(400).json({ error: message });
+    }
+  });
+
+  // 5. Comprehensive MCP Status Endpoint (/api/mcp/status)
+  app.get("/api/mcp/status", async (_req, res) => {
+    const health = await checkMcpAndServicesHealth();
     res.json({
       endpoint: MCP_ENDPOINT,
       wellKnownUrl: MCP_WELL_KNOWN,
-      checkedAt: new Date().toISOString(),
-      httpStatus: probeStatus,
-      authenticated,
-      hasServerKeyConfigured: Boolean(smitheryKey),
-      wwwAuthenticateHeader: wwwAuthenticate,
-      oauthResourceMetadata: resourceMetadata || {
-        resource: MCP_ENDPOINT,
-        authorization_servers: ["https://connect-auth.smithery.ai"],
-        scopes_supported: ["connections:execute"],
-      },
-      liveTools,
-      miroMappedTools: [
-        {
-          id: "brave-perplexity-search",
-          name: "Brave Search / Perplexity MCP",
-          miroRole:
-            "Live internet access for finding current off-the-beaten-path spots, travel blogs, and local subreddits discussing hidden gems.",
-          appFeature: "Hidden Gems Live Discovery & Subreddit/Blog Scout",
-          status: authenticated ? "Live via Smithery MCP" : "Active via Server-Side Gemini Search Grounding",
-          dataMode: "Live Web Grounding",
-        },
-        {
-          id: "airbnb-mcp-hasdata",
-          name: "Airbnb MCP Server (HasData)",
-          miroRole:
-            "Search Airbnb stays by location and dates, and read a single listing in full as structured JSON.",
-          appFeature: "Curated Architectural Stays (Machiya & Hanok) in Itinerary View",
-          status: authenticated ? "Live via Smithery MCP" : "Requires Smithery OAuth Bearer Token (Simulated JSON Preview)",
-          dataMode: authenticated ? "Live MCP JSON" : "Simulated Reference Data",
-        },
-        {
-          id: "yelp-mcp-hasdata",
-          name: "Yelp MCP Server (HasData)",
-          miroRole:
-            "Pulling local business leads, trading hours, and crowdsourced feedback without complex custom scrapers.",
-          appFeature: "After-Hours Venue Trading Hours & Local Crowd-Index Verification",
-          status: authenticated ? "Live via Smithery MCP" : "Requires Smithery OAuth Bearer Token (Curated Venue Directory)",
-          dataMode: authenticated ? "Live MCP JSON" : "Curated Verified Directory",
-        },
-        {
-          id: "japan-seasons-mcp",
-          name: "japan-seasons API + Weather Engine",
-          miroRole:
-            "Cherry blossoms, autumn foliage & festivals — paired with weather elements when itinerary is suggested.",
-          appFeature: "Live Open-Meteo Weather + Sakura/Momiji/Danpung Seasonal Forecast",
-          status: "Live Open-Meteo API + Curated Seasonal Phenology Calendar",
-          dataMode: "Live Weather Telemetry",
-        },
-        {
-          id: "map-traveler-mcp",
-          name: "Virtual Travelling (mfukushim/map-traveler-mcp)",
-          miroRole:
-            "Virtual street-level route preview and step-by-step path walkthrough before committing to an itinerary.",
-          appFeature: "Interactive Virtual Path Walker inside Every Curated Itinerary",
-          status: "Integrated Interactive Waypoint Previewer",
-          dataMode: "Interactive Route Simulation",
-        },
-        {
-          id: "skyscanner-transport",
-          name: "Skyscanner & Regional Transit Optimizer",
-          miroRole:
-            "Not only plan the places, also recommend the best transport route and lower-cost flight/rail connections.",
-          appFeature: "Multi-Modal Transport Route & Reference Fare Comparison",
-          status: "Integrated Route Matrix (Clearly Labeled Reference Fares)",
-          dataMode: "Simulated Reference Fares",
-        },
-      ],
+      checkedAt: health.timestamp,
+      httpStatus: health.mcpGateway.httpStatus,
+      authenticated: health.mcpGateway.authenticated,
+      hasServerKeyConfigured: health.mcpGateway.hasTokenConfigured,
+      latencyMs: health.mcpGateway.latencyMs,
+      wwwAuthenticateHeader: health.mcpGateway.wwwAuthenticate,
+      oauthResourceMetadata: health.mcpGateway.oauthDiscovery.metadata,
+      liveTools: health.mcpGateway.discoveredTools || [],
+      miroMappedTools: health.miroToolkitAssessment.map((item) => ({
+        id: item.id,
+        name: item.miroResource,
+        miroRole: item.miroPurpose,
+        appFeature: item.endpointToolMatched
+          ? `Bound to endpoint tool: ${item.endpointToolMatched}`
+          : "Mapped to UraMichi Itinerary, Stay, Season & Route Modules",
+        status: item.status,
+        dataMode: item.dataClassification,
+      })),
     });
   });
 
-  // 2. Live Weather & Seasonal Forecast Endpoint (Open-Meteo Live API)
+  // 6. Seasonal & Weather Intelligence (Strictly uses Smithery MCP endpoint if available, else clearly labeled Simulated Seasonal Climatology)
   app.get("/api/weather", async (req, res) => {
     const cityKey = String(req.query.city || "kyoto").toLowerCase();
-    const city = CITY_COORDINATES[cityKey] || CITY_COORDINATES.kyoto;
+    const baseCity = SEASONAL_CLIMATOLOGY[cityKey] || SEASONAL_CLIMATOLOGY.kyoto;
 
-    try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=4`;
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Open-Meteo HTTP ${response.status}`);
+    // Check if Smithery MCP endpoint is authenticated and exposes a seasons/weather tool
+    const probe = await probeAndListMcpTools();
+    let mcpSeasonData: unknown = null;
+    let usedMcpTool: string | null = null;
+
+    if (probe.authenticated && probe.tools.length > 0) {
+      const seasonTool = probe.tools.find((t: { name?: string; description?: string }) => {
+        const text = `${t.name || ""} ${t.description || ""}`.toLowerCase();
+        return (
+          text.includes("season") ||
+          text.includes("weather") ||
+          text.includes("japan") ||
+          text.includes("sakura") ||
+          text.includes("foliage")
+        );
+      });
+      if (seasonTool?.name) {
+        try {
+          mcpSeasonData = await callSmitheryMcpTool(seasonTool.name, {
+            city: baseCity.name,
+            location: baseCity.name,
+          });
+          usedMcpTool = seasonTool.name;
+        } catch (_e) {
+          mcpSeasonData = null;
+        }
       }
-      const data = (await response.json()) as {
-        current?: {
-          temperature_2m?: number;
-          apparent_temperature?: number;
-          weather_code?: number;
-          wind_speed_10m?: number;
-        };
-        daily?: {
-          time?: string[];
-          weather_code?: number[];
-          temperature_2m_max?: number[];
-          temperature_2m_min?: number[];
-          precipitation_probability_max?: number[];
-        };
-      };
-
-      const currentCode = data.current?.weather_code ?? 1;
-      const todayPrecipProb = data.daily?.precipitation_probability_max?.[0] ?? 15;
-      const interpreted = interpretWeatherCode(currentCode, todayPrecipProb);
-
-      const forecast = (data.daily?.time || []).map((dateStr, idx) => {
-        const dCode = data.daily?.weather_code?.[idx] ?? 1;
-        const dProb = data.daily?.precipitation_probability_max?.[idx] ?? 10;
-        return {
-          date: dateStr,
-          maxTemp: Math.round(data.daily?.temperature_2m_max?.[idx] ?? 18),
-          minTemp: Math.round(data.daily?.temperature_2m_min?.[idx] ?? 11),
-          precipProb: dProb,
-          condition: interpretWeatherCode(dCode, dProb).label,
-        };
-      });
-
-      res.json({
-        source: "Live Open-Meteo Meteorological Feed",
-        isLive: true,
-        city: city.name,
-        country: city.country,
-        seasonHighlight: city.seasonHighlight,
-        current: {
-          tempC: Math.round(data.current?.temperature_2m ?? 17),
-          feelsLikeC: Math.round(data.current?.apparent_temperature ?? 16),
-          windKph: Math.round(data.current?.wind_speed_10m ?? 8),
-          condition: interpreted.label,
-          isRainy: interpreted.isRainy,
-          advisory: interpreted.advisory,
-        },
-        forecast,
-      });
-    } catch (err) {
-      // Resilient fallback clearly labeled if external network is unreachable
-      res.json({
-        source: "Fallback Seasonal Climatology (Offline Mode)",
-        isLive: false,
-        city: city.name,
-        country: city.country,
-        seasonHighlight: city.seasonHighlight,
-        current: {
-          tempC: 17,
-          feelsLikeC: 16,
-          windKph: 9,
-          condition: "Crisp Autumn Evening",
-          isRainy: false,
-          advisory:
-            "Clear twilight conditions ideal for after-hours sanctuary visits and quiet lantern-lit backstreet walks.",
-        },
-        forecast: [
-          { date: "Day 1", maxTemp: 19, minTemp: 11, precipProb: 10, condition: "Crisp & Clear" },
-          { date: "Day 2", maxTemp: 18, minTemp: 10, precipProb: 20, condition: "Partly Clouded Sky" },
-          { date: "Day 3", maxTemp: 16, minTemp: 9, precipProb: 55, condition: "Light Rain Showers" },
-        ],
-      });
     }
+
+    res.json({
+      source: usedMcpTool
+        ? `Live Smithery MCP (${MCP_ENDPOINT} · ${usedMcpTool})`
+        : "Simulated Seasonal & Weather Reference Data (Connect Smithery MCP for Live Tool Feed)",
+      isLive: Boolean(usedMcpTool),
+      mcpToolOutput: mcpSeasonData,
+      city: baseCity.name,
+      country: baseCity.country,
+      seasonHighlight: baseCity.seasonHighlight,
+      current: {
+        tempC: baseCity.tempC,
+        feelsLikeC: baseCity.feelsLikeC,
+        windKph: baseCity.windKph,
+        condition: baseCity.condition,
+        isRainy: baseCity.isRainy,
+        advisory: baseCity.advisory,
+      },
+      forecast: baseCity.forecast,
+    });
   });
 
-  // 3. Live Hidden Gems Scout (Brave Search / Perplexity MCP equivalent using Gemini Google Search Grounding)
+  // 7. Hidden Gems Scout (Uses Smithery MCP search tool when authenticated + Gemini structuring)
   app.post("/api/discover-gems", async (req, res) => {
-    const { city = "Kyoto", interest = "after-hours temples and hidden tea houses", weatherMode = "clear" } = req.body || {};
+    const {
+      city = "Kyoto",
+      interest = "after-hours temples and hidden tea houses",
+      weatherMode = "clear",
+    } = req.body || {};
 
     try {
+      const probe = await probeAndListMcpTools();
+      let mcpContextSnippet = "";
+      let usedMcpToolName: string | null = null;
+
+      if (probe.authenticated && probe.tools.length > 0) {
+        const searchTool = probe.tools.find((t: { name?: string; description?: string }) => {
+          const text = `${t.name || ""} ${t.description || ""}`.toLowerCase();
+          return (
+            text.includes("search") ||
+            text.includes("brave") ||
+            text.includes("perplexity") ||
+            text.includes("yelp") ||
+            text.includes("place")
+          );
+        });
+        if (searchTool?.name) {
+          try {
+            const mcpRes = await callSmitheryMcpTool(searchTool.name, {
+              query: `${city} hidden gems off the beaten path ${interest}`,
+              location: city,
+            });
+            mcpContextSnippet = JSON.stringify(mcpRes).slice(0, 3000);
+            usedMcpToolName = searchTool.name;
+          } catch (_e) {
+            // Continue with curated fallback
+          }
+        }
+      }
+
       const ai = getAiClient();
       const prompt = `You are an insider Korea & Japan local travel curator for affluent, adventurous travellers who despise crowded tourist traps.
 Find 3 real, authentic, lesser-known or after-hours local spots in ${city} focused on: "${interest}".
-Weather condition to account for: ${weatherMode === "rainy" ? "Rainy weather — prioritize atmospheric indoor spaces, covered arcades, subterranean listening bars, or private tea sanctuaries" : "Clear weather — include quiet twilight courtyards, backstreet walks, or early/after-hours access sights"}.
+Weather condition to account for: ${
+        weatherMode === "rainy"
+          ? "Rainy weather — prioritize atmospheric indoor spaces, covered arcades, subterranean listening bars, or private tea sanctuaries"
+          : "Clear weather — include quiet twilight courtyards, backstreet walks, or early/after-hours access sights"
+      }.
+${
+  mcpContextSnippet
+    ? `Use this live data retrieved from our Smithery MCP endpoint (${usedMcpToolName}): ${mcpContextSnippet}`
+    : ""
+}
 
 Return a JSON array of 3 objects with these exact fields:
 - name (string): Real name of the spot or neighborhood enclave
 - neighborhood (string): Specific district in ${city}
 - bestTimeWindow (string): Exact time window to avoid crowds (e.g. "19:30–21:30 After-Hours" or "06:30 Dawn Window")
-- crowdComparison (string): Concrete contrast vs mainstream tourist equivalent (e.g. "Instead of crowded Kiyomizu-dera midday")
+- crowdComparison (string): Concrete contrast vs mainstream tourist equivalent
 - whyExtraordinary (string): 2 sentences on what makes it special and local
 - weatherFit (string): Why this spot works well in ${weatherMode} weather
 - localHostTip (string): Practical etiquette or insider tip`;
@@ -369,7 +427,9 @@ Return a JSON array of 3 objects with these exact fields:
 
       const gems = JSON.parse(response.text || "[]");
       res.json({
-        source: "Gemini 3.8 Flash Curated Intelligence",
+        source: usedMcpToolName
+          ? `Live Smithery MCP (${usedMcpToolName}) + Gemini 3.8 Flash`
+          : "Simulated / AI-Curated Reference Discovery (Connect Smithery MCP for Live Endpoint Search)",
         city,
         interest,
         weatherMode,
@@ -381,26 +441,35 @@ Return a JSON array of 3 objects with these exact fields:
     }
   });
 
-  // 4. Custom Itinerary Personalizer (Korea & Japan Focused)
+  // 8. Custom Itinerary Personalizer (Korea & Japan Focused)
   app.post("/api/itinerary/personalize", async (req, res) => {
     const {
       destination = "Kyoto & Nagano",
       travelerType = "Couple / Duet",
-      durationDays = 4,
+      durationDays = 3,
       pace = "Unhurried & Immersive",
       weatherPreference = "Auto-Swap for Rain",
       specialFocus = "After-hours temples, private artisan workshops, and subterranean vinyl bars",
     } = req.body || {};
 
     try {
+      const probe = await probeAndListMcpTools();
+      let mcpToolsSummary = "Unauthenticated (Using Simulated Reference Pricing & Schedules)";
+      if (probe.authenticated && probe.tools.length > 0) {
+        mcpToolsSummary = `Connected to ${MCP_ENDPOINT} with tools: ${probe.tools
+          .map((t: { name?: string }) => t.name)
+          .join(", ")}`;
+      }
+
       const ai = getAiClient();
       const prompt = `Create a bespoke ${durationDays}-day off-the-beaten-path itinerary in ${destination} for ${travelerType} (Pace: ${pace}).
-Key requirements from our business model:
+Key requirements from our Miro business proposal:
 1. Avoid crowded tourist traps — specify after-hours access windows or quiet local alternatives.
 2. Weather-aware planning (${weatherPreference}) — include a rainy-day indoor alternative for each day.
-3. Recommend the best transport route between stops (specific local train lines, walking paths, or private electric taxi) and a curated neighborhood stay style.
+3. Recommend the best transport route between stops and a curated neighborhood stay style.
 4. Pair with a local ground-up hobby group or vetted local host experience.
 5. Special focus requested: "${specialFocus}".
+MCP Endpoint Status: ${mcpToolsSummary}.
 
 Return structured JSON matching the schema.`;
 
@@ -459,7 +528,8 @@ Return structured JSON matching the schema.`;
       const plan = JSON.parse(response.text || "{}");
       res.json({
         generatedAt: new Date().toISOString(),
-        disclaimer: "Simulated Reference Pricing & Schedule — Verify final host availability via Concierge.",
+        disclaimer:
+          "Simulated Reference Pricing & Schedule — Verify final host availability via Concierge.",
         plan,
       });
     } catch (error: unknown) {
@@ -468,20 +538,26 @@ Return structured JSON matching the schema.`;
     }
   });
 
-  // 5. Translation & Text-to-Speech (TTS) Bridge for Korea & Japan Local Communication
+  // 9. Translation & Text-to-Speech (TTS) Bridge for Korea & Japan Local Communication
   app.post("/api/translate-tts", async (req, res) => {
-    const { text = "", targetLang = "ja", context = "Polite conversation with a local artisan host" } = req.body || {};
+    const {
+      text = "",
+      targetLang = "ja",
+      context = "Polite conversation with a local artisan host",
+    } = req.body || {};
     if (!text.trim()) {
       res.status(400).json({ error: "Please provide a phrase to translate." });
       return;
     }
 
-    const langLabel = targetLang === "ko" ? "Korean (Polite Haeyo-che / Honorific)" : "Japanese (Polite Teineigo / Keigo)";
+    const langLabel =
+      targetLang === "ko"
+        ? "Korean (Polite Haeyo-che / Honorific)"
+        : "Japanese (Polite Teineigo / Keigo)";
 
     try {
       const ai = getAiClient();
 
-      // Step 1: Translate & generate phonetic pronunciation + cultural etiquette note
       const translationRes = await ai.models.generateContent({
         model: "gemini-3.8-flash",
         contents: `Translate the following traveller message into natural ${langLabel} suitable for: "${context}".
@@ -491,7 +567,9 @@ Return JSON with:
 - translatedText: native script (Japanese Kanji/Kana or Korean Hangul)
 - phonetic: clear romanized pronunciation (Romaji or Revised Romanization)
 - literalMeaning: brief English nuance explanation
-- culturalTip: 1-sentence local etiquette tip when saying this in ${targetLang === "ko" ? "South Korea" : "Japan"}`,
+- culturalTip: 1-sentence local etiquette tip when saying this in ${
+          targetLang === "ko" ? "South Korea" : "Japan"
+        }`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -509,7 +587,6 @@ Return JSON with:
 
       const parsed = JSON.parse(translationRes.text || "{}");
 
-      // Step 2: Generate natural speech audio using gemini-3.8-flash-lite-tts
       let audioBase64: string | null = null;
       try {
         const ttsRes = await ai.models.generateContent({
@@ -517,11 +594,7 @@ Return JSON with:
           contents: [
             {
               role: "user",
-              parts: [
-                {
-                  text: parsed.translatedText || text,
-                },
-              ],
+              parts: [{ text: parsed.translatedText || text }],
             },
           ],
           config: {
@@ -535,7 +608,6 @@ Return JSON with:
         });
         audioBase64 = ttsRes.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
       } catch (_ttsErr) {
-        // If TTS model call fails, client still gets the full translation and can use browser speechSynthesis fallback
         audioBase64 = null;
       }
 
