@@ -1,0 +1,6 @@
+{
+  "name": "UraMichi — Korea & Japan Hidden Path Concierge",
+  "description": "Mobile-first curated travel platform for affluent, adventurous travellers seeking after-hours access, weather-adaptive itineraries, local hobby hosts, and live translation across Japan and South Korea.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
