@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
+import healthHandler from "./api/health.js";
 
 dotenv.config();
 
@@ -89,6 +90,11 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json({ limit: "2mb" }));
+
+  // 0. MCP & API Health Monitor (/api/health and /api/health.js)
+  app.get(["/api/health", "/api/health.js"], (req, res) => {
+    healthHandler(req, res);
+  });
 
   // 1. Live MCP Toolkit Assessment & Probe Endpoint
   app.get("/api/mcp/status", async (_req, res) => {

@@ -33,6 +33,8 @@ interface ProposalMcpViewProps {
 
 export const ProposalMcpView: React.FC<ProposalMcpViewProps> = ({ onNavigateTab }) => {
   const [mcpStatus, setMcpStatus] = useState<McpStatusPayload | null>(null);
+  const [healthPayload, setHealthPayload] = useState<Record<string, unknown> | null>(null);
+  const [showHealthJson, setShowHealthJson] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,10 +42,17 @@ export const ProposalMcpView: React.FC<ProposalMcpViewProps> = ({ onNavigateTab 
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/mcp/status");
+      const [res, healthRes] = await Promise.all([
+        fetch("/api/mcp/status"),
+        fetch("/api/health.js"),
+      ]);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as McpStatusPayload;
       setMcpStatus(data);
+      if (healthRes.ok) {
+        const hData = (await healthRes.json()) as Record<string, unknown>;
+        setHealthPayload(hData);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Unable to probe MCP endpoint");
     } finally {
@@ -238,16 +247,37 @@ export const ProposalMcpView: React.FC<ProposalMcpViewProps> = ({ onNavigateTab 
                   Probing <code className="font-mono text-stone-800">{mcpStatus.endpoint}</code> confirms it is protected by Smithery Connect Auth (<code className="font-mono text-stone-800">{mcpStatus.oauthResourceMetadata.authorization_servers?.[0] || "https://connect-auth.smithery.ai"}</code>, required scope: <code className="font-mono text-stone-800">connections:execute</code>). When <code className="font-mono text-stone-800">SMITHERY_API_KEY</code> is set in server secrets, JSON-RPC calls route directly through Smithery; otherwise, the MVP seamlessly uses live Open-Meteo weather, server-side Gemini 3.8 Flash &amp; TTS, and clearly labeled simulated reference datasets for Airbnb/Yelp/Skyscanner.
                 </p>
               </div>
-              <a
-                href={mcpStatus.wellKnownUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="min-h-[44px] px-3.5 py-2 text-xs font-medium text-stone-700 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors flex items-center gap-1.5 self-start whitespace-nowrap"
-              >
-                <span>View OAuth Metadata</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+              <div className="flex flex-wrap items-center gap-2 self-start">
+                <button
+                  type="button"
+                  onClick={() => setShowHealthJson(!showHealthJson)}
+                  className="min-h-[44px] px-3.5 py-2 text-xs font-mono text-stone-800 bg-[#F8F7F4] border border-stone-300 rounded-xl hover:bg-stone-100 transition-colors whitespace-nowrap"
+                >
+                  {showHealthJson ? "Hide /api/health.js JSON" : "Inspect /api/health.js"}
+                </button>
+                <a
+                  href={mcpStatus.wellKnownUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-h-[44px] px-3.5 py-2 text-xs font-medium text-stone-700 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <span>View OAuth Metadata</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
             </div>
+
+            {showHealthJson && healthPayload && (
+              <div className="p-4 bg-stone-900 text-stone-100 rounded-xl space-y-2">
+                <div className="flex items-center justify-between text-xs text-stone-400 font-mono">
+                  <span>GET /api/health.js — Live MCP &amp; Telemetry Monitor</span>
+                  <span>Status: {String(healthPayload.status || "ok").toUpperCase()}</span>
+                </div>
+                <pre className="text-[11px] font-mono overflow-x-auto max-h-72">
+                  {JSON.stringify(healthPayload, null, 2)}
+                </pre>
+              </div>
+            )}
 
             {/* Table of 6 Mapped Tools from Miro "Key Resources" */}
             <div className="overflow-x-auto">
