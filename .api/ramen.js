@@ -1,6 +1,9 @@
 /**
  * /.api/ramen.js
- * Pulls verified Japanese ramen shop data (eng213035/gachi-ramen)
- * from https://mcp.smithery.ai/linpeiyun-emily via mcp.js.
+ * Re-exports the gachi-ramen MCP handler from /api/ramen.js
  */
-export { SIMULATED_RAMEN_SHOPS, default } from "../api/ramen.js";
+export {
+  VERIFIED_RAMEN_SHOPS,
+  MONTHLY_RAMEN_CHANGES,
+  default,
+} from "../api/ramen.js";

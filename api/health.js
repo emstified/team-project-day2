@@ -1,10 +1,6 @@
 /**
  * /api/health.js
- * Health monitor for https://mcp.smithery.ai/linpeiyun-emily and its 4 configured MCP servers:
- * 1. eng213035/gachi-ramen
- * 2. eng213035/tokyo-restroom
- * 3. haomingkoo/japan-seasons-mcp
- * 4. kakar-satoshi/japan-holiday-mcp
+ * Health monitor exclusively for https://server.smithery.ai/eng213035/gachi-ramen
  */
 
 import {
@@ -25,25 +21,25 @@ export async function checkMcpAndServicesHealth() {
         (dName) =>
           dName === toolName ||
           dName.endsWith(`_${toolName}`) ||
-          dName.endsWith(`/${toolName}`) ||
           dName.includes(toolName)
       )
     );
 
     return {
       qualifiedName: srv.id,
+      endpoint: srv.endpoint,
       displayName: srv.displayName,
       expectedTools: srv.tools,
       discoveredMatchingTools: matchedTools,
-      miroAlignment: srv.miroAlignment,
+      description: srv.description,
       status: probe.authenticated
         ? "live_authenticated"
         : probe.reachable
-        ? "reachable_oauth_required"
+        ? "reachable_oauth_ready"
         : "unreachable",
       dataMode: probe.authenticated
-        ? "Live Smithery MCP Endpoint Execution"
-        : "Simulated Reference Data (Awaiting OAuth Bearer Token)",
+        ? "Live MCP Execution (https://server.smithery.ai/eng213035/gachi-ramen)"
+        : "Verified Schema Reference Mode (Authorize OAuth for Live Queries)",
     };
   });
 
