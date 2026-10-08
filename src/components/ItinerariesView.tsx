@@ -11,27 +11,38 @@ import {
   Train,
   Home,
   Footprints,
-  Code2,
   Check,
   ArrowRight,
   Clock,
   Compass,
+  Calendar,
+  AlertTriangle,
 } from "lucide-react";
 
-interface WeatherPayload {
+interface HolidayEntry {
+  date: string;
+  nameJa: string;
+  nameEn: string;
+  isThreeDayWeekend: boolean;
+  crowdImpact: string;
+  afterHoursStrategy: string;
+}
+
+interface SeasonsHolidaysPayload {
   source: string;
-  isLive: boolean;
+  isLiveMcp: boolean;
   city: string;
   country: string;
   seasonHighlight: string;
+  koyoOrSakuraStatus: string;
   current: {
     tempC: number;
-    feelsLikeC: number;
-    windKph: number;
     condition: string;
     isRainy: boolean;
     advisory: string;
   };
+  festivals: { name: string; dates: string; crowdTip: string }[];
+  fruitFarms: { name: string; fruit: string; season: string; region: string }[];
   forecast: {
     date: string;
     maxTemp: number;
@@ -39,6 +50,12 @@ interface WeatherPayload {
     precipProb: number;
     condition: string;
   }[];
+  holidayCheck: {
+    checkedDate: string;
+    isNationalHoliday: boolean;
+    holidayDetail: HolidayEntry | null;
+    upcomingHolidays: HolidayEntry[];
+  };
 }
 
 interface ItinerariesViewProps {
@@ -60,42 +77,40 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
   const [activeWeatherCity, setActiveWeatherCity] = useState<
     "kyoto" | "seoul" | "nagano" | "jeju" | "tokyo"
   >("kyoto");
-  const [weatherData, setWeatherData] = useState<WeatherPayload | null>(null);
-  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [selectedTravelDate, setSelectedTravelDate] = useState("2026-11-03");
+  const [seasonData, setSeasonData] = useState<SeasonsHolidaysPayload | null>(null);
+  const [seasonLoading, setSeasonLoading] = useState(false);
 
-  // Selected Itinerary for full end-to-end inspection
   const [activeItinerary, setActiveItinerary] = useState<CuratedItinerary>(CURATED_ITINERARIES[0]);
   const [activeDetailTab, setActiveDetailTab] = useState<
     "schedule" | "transport-stay" | "virtual-walk"
   >("schedule");
-  const [showRawAirbnbJson, setShowRawAirbnbJson] = useState(false);
   const [activeWaypointIdx, setActiveWaypointIdx] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    const loadWeather = async () => {
-      setWeatherLoading(true);
+    const loadSeasonAndHolidays = async () => {
+      setSeasonLoading(true);
       try {
-        const res = await fetch(`/api/weather?city=${activeWeatherCity}`);
-        if (!res.ok) throw new Error("Weather fetch failed");
-        const data = (await res.json()) as WeatherPayload;
+        const res = await fetch(
+          `/api/seasons-holidays?city=${activeWeatherCity}&date=${selectedTravelDate}`
+        );
+        if (!res.ok) throw new Error("Failed to fetch seasonal data");
+        const data = (await res.json()) as SeasonsHolidaysPayload;
         if (!cancelled) {
-          setWeatherData(data);
-          if (data.current.isRainy) {
-            setWeatherMode("rainy");
-          }
+          setSeasonData(data);
         }
       } catch (_e) {
         // Ignore
       } finally {
-        if (!cancelled) setWeatherLoading(false);
+        if (!cancelled) setSeasonLoading(false);
       }
     };
-    loadWeather();
+    loadSeasonAndHolidays();
     return () => {
       cancelled = true;
     };
-  }, [activeWeatherCity]);
+  }, [activeWeatherCity, selectedTravelDate]);
 
   const filteredItineraries = CURATED_ITINERARIES.filter((item) => {
     const matchesCountry = countryFilter === "ALL" || item.country === countryFilter;
@@ -131,7 +146,7 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
             <span aria-hidden="true">·</span>
             <span>After-Hours Sanctuary Access</span>
             <span aria-hidden="true">·</span>
-            <span>Weather-Adaptive Routing</span>
+            <span>Holiday &amp; Weather-Smart Routing</span>
           </div>
 
           <h1 className="font-serif-display text-3xl sm:text-5xl font-semibold tracking-tight leading-[1.12] text-white">
@@ -139,7 +154,7 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
           </h1>
 
           <p className="text-sm sm:text-base text-stone-200 max-w-2xl leading-relaxed">
-            Proven, reasonably priced itineraries for adventurous individuals and families who are tired of overcrowded tourist landmarks. Featuring private twilight temple entry, weather-smart indoor swaps, optimal transport routing, and local hobby collectives.
+            Curated, reasonably priced itineraries for adventurous individuals and families who want to escape overcrowded tourist landmarks. Featuring private twilight temple entry, national holiday crowd-avoidance alerts, weather-smart indoor swaps, and local hobby hosts.
           </p>
 
           <div className="pt-2 flex flex-wrap items-center gap-3">
@@ -161,20 +176,20 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
         </div>
       </section>
 
-      {/* 2. Live Weather & Seasonal Phenology Strip (Open-Meteo + japan-seasons) */}
+      {/* 2. Seasonal Phenology, Weather & Holiday Crowd-Avoidance Strip (japan-seasons-mcp + japan-holiday-mcp) */}
       <section
-        aria-label="Live Weather and Seasonal Intelligence"
-        className="bg-white border border-stone-200/90 rounded-2xl p-5 md:p-6 space-y-4"
+        aria-label="Seasonal Foliage, Weather, and Holiday Crowd Intelligence"
+        className="bg-white border border-stone-200/90 rounded-2xl p-5 md:p-6 space-y-5"
       >
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
-              <span>Seasonal &amp; Weather Routing Engine</span>
+              <span>Seasonal &amp; Holiday Crowd Planner</span>
               <span aria-hidden="true">·</span>
-              <span>{weatherData?.source || "Smithery MCP / Simulated Seasonal Reference"}</span>
+              <span>{seasonData?.source || "Loading Seasonal & Holiday Feed..."}</span>
             </div>
             <h2 className="font-serif-display text-xl md:text-2xl font-semibold text-stone-900">
-              Weather-Adaptive Itinerary Engine &amp; Foliage Tracker
+              Foliage, Weather &amp; National Holiday Crowd-Avoidance Check
             </h2>
           </div>
 
@@ -183,10 +198,10 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
             {(
               [
                 { key: "kyoto", label: "Kyoto" },
-                { key: "seoul", label: "Seoul" },
-                { key: "nagano", label: "Nagano" },
-                { key: "jeju", label: "Jeju Island" },
                 { key: "tokyo", label: "Tokyo" },
+                { key: "nagano", label: "Nagano" },
+                { key: "seoul", label: "Seoul" },
+                { key: "jeju", label: "Jeju Island" },
               ] as const
             ).map((c) => (
               <button
@@ -205,66 +220,119 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
           </div>
         </div>
 
-        {weatherData && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 pt-2 border-t border-stone-100 items-center">
-            <div className="lg:col-span-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#F8F7F4] border border-stone-200 flex items-center justify-center shrink-0">
-                {weatherData.current.isRainy || weatherMode === "rainy" ? (
-                  <CloudRain className="w-6 h-6 text-[#1E3A5F]" />
-                ) : (
-                  <Sun className="w-6 h-6 text-amber-600" />
-                )}
-              </div>
-              <div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-semibold font-mono tabular-nums text-stone-900">
-                    {weatherData.current.tempC}°C
-                  </span>
-                  <span className="text-xs text-stone-600">
-                    {weatherData.city}, {weatherData.country} · {weatherData.current.condition}
-                  </span>
+        {seasonData && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 pt-3 border-t border-stone-100 items-start">
+            {/* Weather & Koyo/Sakura Status */}
+            <div className="lg:col-span-5 space-y-2.5">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-[#F8F7F4] border border-stone-200 flex items-center justify-center shrink-0">
+                  {weatherMode === "rainy" ? (
+                    <CloudRain className="w-5 h-5 text-[#1E3A5F]" />
+                  ) : (
+                    <Sun className="w-5 h-5 text-amber-600" />
+                  )}
                 </div>
-                <p className="text-xs text-[#1E3A5F] font-medium mt-0.5">
-                  Season: {weatherData.seasonHighlight}
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-semibold font-mono tabular-nums text-stone-900">
+                      {seasonData.current.tempC}°C
+                    </span>
+                    <span className="text-xs text-stone-600">
+                      {seasonData.city}, {seasonData.country} · {seasonData.current.condition}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#1E3A5F] font-medium mt-0.5">
+                    {seasonData.koyoOrSakuraStatus}
+                  </p>
+                </div>
+              </div>
+
+              {seasonData.fruitFarms[0] && (
+                <p className="text-xs text-stone-600">
+                  <strong className="text-stone-900">Seasonal Harvest Experience:</strong>{" "}
+                  {seasonData.fruitFarms[0].name} — {seasonData.fruitFarms[0].fruit} ({seasonData.fruitFarms[0].season})
                 </p>
+              )}
+
+              {/* Weather Mode Toggle */}
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-xs text-stone-500">Weather Routing:</span>
+                <div className="flex items-center p-1 bg-[#F8F7F4] border border-stone-300 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setWeatherMode("clear")}
+                    className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap ${
+                      weatherMode === "clear"
+                        ? "bg-white text-stone-900 shadow-xs"
+                        : "text-stone-600"
+                    }`}
+                  >
+                    <Sun className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Clear Sky</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWeatherMode("rainy")}
+                    className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap ${
+                      weatherMode === "rainy"
+                        ? "bg-white text-stone-900 shadow-xs"
+                        : "text-stone-600"
+                    }`}
+                  >
+                    <CloudRain className="w-3.5 h-3.5 text-[#1E3A5F]" />
+                    <span>Rainy Swap</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="lg:col-span-4 text-xs text-stone-600 leading-relaxed">
-              {weatherLoading ? "Updating live telemetry..." : weatherData.current.advisory}
-            </div>
-
-            {/* Interactive Weather Mode Switcher */}
-            <div className="lg:col-span-3 flex flex-col sm:flex-row lg:flex-col items-stretch gap-1.5">
-              <span className="text-[11px] text-stone-500">
-                Preview Itinerary Weather Adaptation:
-              </span>
-              <div className="flex items-center p-1 bg-[#F8F7F4] border border-stone-300 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setWeatherMode("clear")}
-                  className={`flex-1 min-h-[38px] py-1.5 px-2 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                    weatherMode === "clear"
-                      ? "bg-white text-stone-900 shadow-xs"
-                      : "text-stone-600"
-                  }`}
+            {/* National Holiday Crowd-Surge Checker (kakar-satoshi/japan-holiday-mcp) */}
+            <div className="lg:col-span-7 p-4 bg-[#F8F7F4] rounded-2xl border border-stone-200/70 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-stone-900">
+                  <Calendar className="w-4 h-4 text-[#1E3A5F]" />
+                  <span>Check Travel Date Against National Holiday Crowd Surges</span>
+                </div>
+                <select
+                  aria-label="Select travel date to check holiday status"
+                  value={selectedTravelDate}
+                  onChange={(e) => setSelectedTravelDate(e.target.value)}
+                  className="min-h-[38px] px-3 py-1 text-xs bg-white border border-stone-300 rounded-xl text-stone-900 font-mono"
                 >
-                  <Sun className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Clear Sky Plan</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWeatherMode("rainy")}
-                  className={`flex-1 min-h-[38px] py-1.5 px-2 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                    weatherMode === "rainy"
-                      ? "bg-white text-stone-900 shadow-xs"
-                      : "text-stone-600"
-                  }`}
-                >
-                  <CloudRain className="w-3.5 h-3.5 text-[#1E3A5F]" />
-                  <span>Rainy Swap</span>
-                </button>
+                  <option value="2026-10-12">2026-10-12 · Sports Day (National Holiday)</option>
+                  <option value="2026-10-20">2026-10-20 · Regular Tuesday (Low Crowd)</option>
+                  <option value="2026-11-03">2026-11-03 · Culture Day (National Holiday)</option>
+                  <option value="2026-11-15">2026-11-15 · Regular Mid-Month Window</option>
+                  <option value="2026-11-23">2026-11-23 · Labour Thanksgiving (Holiday)</option>
+                </select>
               </div>
+
+              {seasonLoading ? (
+                <p className="text-xs text-stone-500">Checking holiday calendar...</p>
+              ) : seasonData.holidayCheck.isNationalHoliday &&
+                seasonData.holidayCheck.holidayDetail ? (
+                <div className="p-3 bg-amber-50/90 border border-amber-200 rounded-xl text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-semibold text-amber-950">
+                    <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0" />
+                    <span>
+                      Holiday Crowd Alert: {seasonData.holidayCheck.holidayDetail.nameEn} (
+                      {seasonData.holidayCheck.holidayDetail.nameJa})
+                    </span>
+                  </div>
+                  <p className="text-amber-900">
+                    <strong>Impact:</strong> {seasonData.holidayCheck.holidayDetail.crowdImpact}
+                  </p>
+                  <p className="text-[#1E3A5F] font-medium">
+                    <strong>UraMichi Auto-Adjustment:</strong>{" "}
+                    {seasonData.holidayCheck.holidayDetail.afterHoursStrategy}
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 bg-white border border-stone-200/80 rounded-xl text-xs text-stone-700">
+                  <strong className="text-emerald-800">Non-Holiday Window ({selectedTravelDate}):</strong>{" "}
+                  No Japanese Cabinet Office national holiday falls on this date. Ideal conditions for quiet daytime artisan studios and evening temple access.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -285,7 +353,6 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
             </h2>
           </div>
 
-          {/* Country & Group Filters */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center p-1 bg-stone-200/70 rounded-xl">
               {(["ALL", "Japan", "South Korea"] as const).map((c) => (
@@ -383,7 +450,7 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
                     onClick={() => handleSelectItinerary(item)}
                     className="flex-1 min-h-[44px] px-4 py-2 text-xs font-medium bg-stone-900 text-white rounded-xl hover:bg-stone-800 transition-colors whitespace-nowrap"
                   >
-                    {isSelected ? "Currently Inspecting Below" : "Inspect Route, Stay & Virtual Walk"}
+                    {isSelected ? "Currently Inspecting Below" : "Inspect Schedule, Stay & Route"}
                   </button>
                   <button
                     type="button"
@@ -447,7 +514,7 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
           </div>
         </div>
 
-        {/* Interactive Sub-Navigation Tabs for Deep Dive */}
+        {/* Sub-Navigation Tabs for Deep Dive */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-1 p-1 bg-[#F8F7F4] border border-stone-200 rounded-xl">
             <button
@@ -484,7 +551,7 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
               }`}
             >
               <Footprints className="w-3.5 h-3.5" />
-              <span>03. Virtual Path Walker (map-traveler-mcp)</span>
+              <span>03. Virtual Path Preview</span>
             </button>
           </div>
 
@@ -537,7 +604,7 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
                     )}
                   </div>
                   <span className="font-mono text-stone-500">
-                    Yelp Verified Hours: {stop.yelpBusinessMeta.tradingHours}
+                    Hours: {stop.yelpBusinessMeta.tradingHours}
                   </span>
                 </div>
 
@@ -589,17 +656,16 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
           </div>
         )}
 
-        {/* Tab 2: Best Transport Routes & Curated Stay (Skyscanner + Airbnb MCP Schema) */}
+        {/* Tab 2: Best Transport Routes & Curated Stay */}
         {activeDetailTab === "transport-stay" && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Transport Routes */}
             <div className="lg:col-span-6 space-y-4">
               <div>
                 <p className="text-xs text-stone-500">
-                  Miro Proposition: Recommend Best Transport Route &amp; Lower-Cost Connections
+                  Recommended Door-to-Door Transit &amp; Lower-Cost Connections
                 </p>
                 <h3 className="font-serif-display text-2xl font-semibold text-stone-900 mt-0.5">
-                  Optimal Door-to-Door Transport Routing
+                  Optimal Transport Routing
                 </h3>
               </div>
 
@@ -620,25 +686,14 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
               ))}
             </div>
 
-            {/* Curated Accommodation (Airbnb MCP Schema) */}
             <div className="lg:col-span-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-stone-500">
-                    Miro Resource: Airbnb MCP Server Structured Listing Preview
-                  </p>
-                  <h3 className="font-serif-display text-2xl font-semibold text-stone-900 mt-0.5">
-                    Recommended Architectural Stay
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowRawAirbnbJson(!showRawAirbnbJson)}
-                  className="min-h-[38px] px-3 py-1.5 text-xs font-mono text-stone-700 bg-[#F8F7F4] border border-stone-300 rounded-xl flex items-center gap-1.5 whitespace-nowrap"
-                >
-                  <Code2 className="w-3.5 h-3.5" />
-                  <span>{showRawAirbnbJson ? "Hide JSON" : "Inspect MCP JSON"}</span>
-                </button>
+              <div>
+                <p className="text-xs text-stone-500">
+                  Curated Neighbourhood Accommodation (Simulated Reference Stay)
+                </p>
+                <h3 className="font-serif-display text-2xl font-semibold text-stone-900 mt-0.5">
+                  Recommended Architectural Stay
+                </h3>
               </div>
 
               <div className="p-5 bg-[#F8F7F4] rounded-2xl space-y-3 border border-stone-200/70">
@@ -662,27 +717,21 @@ export const ItinerariesView: React.FC<ItinerariesViewProps> = ({
                 <p className="text-sm text-stone-700 leading-relaxed">
                   {activeItinerary.curatedStay.architecturalHighlight}
                 </p>
-
-                {showRawAirbnbJson && (
-                  <pre className="p-3.5 bg-stone-900 text-stone-100 rounded-xl text-[11px] font-mono overflow-x-auto">
-                    {JSON.stringify(activeItinerary.curatedStay.structuredJsonPreview, null, 2)}
-                  </pre>
-                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* Tab 3: Virtual Travelling Bot Preview (github.com/mfukushim/map-traveler-mcp) */}
+        {/* Tab 3: Virtual Path Preview */}
         {activeDetailTab === "virtual-walk" && (
           <div className="p-6 bg-[#F8F7F4] rounded-2xl space-y-5 border border-stone-200/70">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-200 pb-4">
               <div>
                 <p className="text-xs text-stone-500">
-                  Miro Key Resource: Virtual Travelling (map-traveler-mcp Waypoint Simulator)
+                  Interactive Route Preview Before You Travel
                 </p>
                 <h3 className="font-serif-display text-2xl font-semibold text-stone-900">
-                  Step-by-Step Street &amp; Sanctuary Preview
+                  Step-by-Step Street &amp; Sanctuary Walkthrough
                 </h3>
               </div>
               <div className="flex items-center gap-1.5">

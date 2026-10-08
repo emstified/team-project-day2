@@ -7,12 +7,12 @@ import { createServer as createViteServer } from "vite";
 import healthHandler, { checkMcpAndServicesHealth } from "./api/health.js";
 import {
   MCP_ENDPOINT,
-  MCP_WELL_KNOWN,
   createSmitheryOAuthUrl,
   exchangeSmitheryOAuthCode,
   probeAndListMcpTools,
   callSmitheryMcpTool,
   clearActiveToken,
+  getActiveToken,
 } from "./api/mcpClient.js";
 
 dotenv.config();
@@ -31,113 +31,360 @@ function getAiClient() {
   });
 }
 
-const SEASONAL_CLIMATOLOGY: Record<
+// Simulated Reference Datasets matching the exact schemas of the 4 Smithery MCP tools
+const SIMULATED_SEASONS_BY_CITY: Record<
   string,
   {
-    name: string;
+    city: string;
     country: "Japan" | "South Korea";
     seasonHighlight: string;
+    koyoOrSakuraStatus: string;
     tempC: number;
-    feelsLikeC: number;
-    windKph: number;
     condition: string;
     isRainy: boolean;
     advisory: string;
-    forecast: {
-      date: string;
-      maxTemp: number;
-      minTemp: number;
-      precipProb: number;
-      condition: string;
-    }[];
+    festivals: { name: string; dates: string; crowdTip: string }[];
+    fruitFarms: { name: string; fruit: string; season: string; region: string }[];
+    forecast: { date: string; maxTemp: number; minTemp: number; precipProb: number; condition: string }[];
   }
 > = {
   kyoto: {
-    name: "Kyoto",
+    city: "Kyoto",
     country: "Japan",
-    seasonHighlight: "Autumn Momiji Peak & Private Temple Night Illumination (Oct–Nov)",
+    seasonHighlight: "Autumn Momiji (Koyo) Peak & Daitoku-ji Evening Illumination",
+    koyoOrSakuraStatus: "Koyo Forecast: Peak crimson maple foliage Nov 12–Nov 28 across Northern Kyoto temples",
     tempC: 17,
-    feelsLikeC: 16,
-    windKph: 7,
     condition: "Crisp Twilight Air",
     isRainy: false,
     advisory:
-      "Clear evening conditions for after-hours Daitoku-ji courtyard walks; toggle Rainy Swap to preview covered machiya tea sanctuaries.",
+      "Clear conditions for after-hours temple garden walks; toggle Rainy Swap to preview covered machiya tea sanctuaries.",
+    festivals: [
+      {
+        name: "Jidai Matsuri & Kurama Fire Festival Season",
+        dates: "Late October – November",
+        crowdTip: "Skip main daytime parade; book private evening sub-temple viewing in Kita Ward.",
+      },
+    ],
+    fruitFarms: [
+      {
+        name: "Tambabashi Heritage Orchard (Simulated Ref)",
+        fruit: "Kyoto Sweet Persimmons (Kaki) & Japanese Pears",
+        season: "October – November",
+        region: "Southern Kyoto Basin",
+      },
+    ],
     forecast: [
       { date: "Day 1", maxTemp: 19, minTemp: 11, precipProb: 15, condition: "Crisp & Clear" },
       { date: "Day 2", maxTemp: 18, minTemp: 10, precipProb: 20, condition: "Partly Clouded" },
       { date: "Day 3", maxTemp: 16, minTemp: 9, precipProb: 60, condition: "Autumn Mist & Showers" },
     ],
   },
-  seoul: {
-    name: "Seoul",
-    country: "South Korea",
-    seasonHighlight: "Seochon Hanok Ginkgo Gold & Changdeokgung Moonlight Window",
-    tempC: 15,
-    feelsLikeC: 14,
-    windKph: 9,
-    condition: "Clear Mountain Breeze",
+  tokyo: {
+    city: "Tokyo",
+    country: "Japan",
+    seasonHighlight: "Meiji Gaien Ginkgo Gold & Yanaka Backstreet Craft Season",
+    koyoOrSakuraStatus: "Koyo Forecast: Golden ginkgo avenues peak Nov 18–Dec 3; early Kawazu sakura late Feb",
+    tempC: 18,
+    condition: "Clear Evening Sky",
     isRainy: false,
     advisory:
-      "Ideal visibility for Changdeokgung Secret Garden moonlight entry and Inwangsan ridge walks.",
+      "Pleasant evening temperatures for Shimokitazawa vinyl kissa and backstreet ramen walks.",
+    festivals: [
+      {
+        name: "Tori-no-Ichi Rooster Shrine Night Fair",
+        dates: "November Evening Cycle",
+        crowdTip: "Enter after 21:30 via backstreet approach to avoid main torii queue.",
+      },
+    ],
+    fruitFarms: [
+      {
+        name: "Mitaka Urban Kiwi & Citrus Farm (Simulated Ref)",
+        fruit: "Tokyo Gold Kiwi & Yuzu",
+        season: "October – December",
+        region: "Western Tokyo",
+      },
+    ],
     forecast: [
-      { date: "Day 1", maxTemp: 17, minTemp: 9, precipProb: 10, condition: "Crisp & Clear" },
-      { date: "Day 2", maxTemp: 16, minTemp: 8, precipProb: 25, condition: "High Mountain Clouds" },
-      { date: "Day 3", maxTemp: 14, minTemp: 7, precipProb: 55, condition: "Light Rain Showers" },
+      { date: "Day 1", maxTemp: 20, minTemp: 12, precipProb: 10, condition: "Clear Sky" },
+      { date: "Day 2", maxTemp: 19, minTemp: 11, precipProb: 20, condition: "Light Clouds" },
+      { date: "Day 3", maxTemp: 17, minTemp: 10, precipProb: 55, condition: "Evening Rain" },
     ],
   },
   nagano: {
-    name: "Nagano",
+    city: "Nagano",
     country: "Japan",
-    seasonHighlight: "Alpine Cedar Foliage & High-Altitude Rotenburo Season",
+    seasonHighlight: "Togakushi Alpine Cedar & Crimson Ravine Onsen Season",
+    koyoOrSakuraStatus: "Koyo Now: High-elevation maples at full peak color across Togakushi & Obuse",
     tempC: 12,
-    feelsLikeC: 11,
-    windKph: 6,
     condition: "Alpine Morning Mist",
     isRainy: false,
     advisory:
-      "Cool mountain air ideal for open-air rotenburo thermal soaking and Togakushi cedar trails.",
+      "Cool alpine air ideal for private open-air rotenburo soaking and soba milling.",
+    festivals: [
+      {
+        name: "Obuse的新栗 (New Chestnut) Harvest & Soba Matsuri",
+        dates: "October – November",
+        crowdTip: "Visit private village soba mill at 08:30 before highway coaches arrive.",
+      },
+    ],
+    fruitFarms: [
+      {
+        name: "Obuse Shinshu Apple & Shine Muscat Orchard (Simulated Ref)",
+        fruit: "San Fuji Apples & Nagano Purple Grapes",
+        season: "October – November",
+        region: "Kamitakai District, Nagano",
+      },
+    ],
     forecast: [
       { date: "Day 1", maxTemp: 14, minTemp: 5, precipProb: 20, condition: "Alpine Sun & Mist" },
       { date: "Day 2", maxTemp: 13, minTemp: 4, precipProb: 50, condition: "Mountain Showers" },
       { date: "Day 3", maxTemp: 15, minTemp: 6, precipProb: 15, condition: "Crisp & Clear" },
     ],
   },
+  seoul: {
+    city: "Seoul",
+    country: "South Korea",
+    seasonHighlight: "Seochon Hanok Ginkgo Gold & Changdeokgung Moonlight Window",
+    koyoOrSakuraStatus: "Autumn Danpung: Peak crimson maples & golden ginkgo along Inwangsan & Secret Garden",
+    tempC: 15,
+    condition: "Clear Mountain Breeze",
+    isRainy: false,
+    advisory:
+      "Ideal visibility for after-hours Changdeokgung palace lantern walks and Seochon tea courtyards.",
+    festivals: [
+      {
+        name: "Changdeokgung Moonlight Tour & Jongno Craft Week",
+        dates: "October – November Evenings",
+        crowdTip: "Capped night entry permit eliminates 95% of daytime palace crowds.",
+      },
+    ],
+    fruitFarms: [
+      {
+        name: "Namyangju Heritage Pear Orchard (Simulated Ref)",
+        fruit: "Korean Shingo Pears & Persimmons",
+        season: "October – November",
+        region: "Gyeonggi-do (40m from Seoul)",
+      },
+    ],
+    forecast: [
+      { date: "Day 1", maxTemp: 17, minTemp: 9, precipProb: 10, condition: "Crisp & Clear" },
+      { date: "Day 2", maxTemp: 16, minTemp: 8, precipProb: 25, condition: "High Mountain Clouds" },
+      { date: "Day 3", maxTemp: 14, minTemp: 7, precipProb: 55, condition: "Light Rain Showers" },
+    ],
+  },
   jeju: {
-    name: "Jeju Island",
+    city: "Jeju Island",
     country: "South Korea",
     seasonHighlight: "Silver Eulalia Grass (Eoksae) & Basalt Coastal Haenyeo Harvest",
+    koyoOrSakuraStatus: "Hallasan Slopes: Silver grass blooming across eastern volcanic oreum cones",
     tempC: 19,
-    feelsLikeC: 19,
-    windKph: 14,
     condition: "Golden Coastal Breeze",
     isRainy: false,
     advisory:
-      "Mild coastal conditions along Gujwa-eup basalt trails and haenyeo stone hearth dining.",
+      "Mild coastal breeze along Gujwa-eup basalt trails and haenyeo stone fire-pit dining.",
+    festivals: [
+      {
+        name: "Jeju Haenyeo Sea-Diver Heritage Gathering",
+        dates: "Autumn Coastal Window",
+        crowdTip: "Book private village bulteok hearth dinner in Hado-ri away from resort buffets.",
+      },
+    ],
+    fruitFarms: [
+      {
+        name: "Seogwipo Volcanic Hallabong & Green Tangerine Farm (Simulated Ref)",
+        fruit: "Jeju Hallabong & Cheonggyul Tangerines",
+        season: "October – January",
+        region: "East Seogwipo, Jeju",
+      },
+    ],
     forecast: [
       { date: "Day 1", maxTemp: 21, minTemp: 14, precipProb: 15, condition: "Coastal Sun" },
       { date: "Day 2", maxTemp: 20, minTemp: 13, precipProb: 30, condition: "Sea Breeze" },
       { date: "Day 3", maxTemp: 18, minTemp: 12, precipProb: 60, condition: "Passing Island Shower" },
     ],
   },
-  tokyo: {
-    name: "Tokyo",
-    country: "Japan",
-    seasonHighlight: "Shimokitazawa & Yanaka Twilight Backstreet Craft Season",
-    tempC: 18,
-    feelsLikeC: 17,
-    windKph: 8,
-    condition: "Clear Evening Sky",
-    isRainy: false,
-    advisory:
-      "Pleasant evening temperatures for backstreet gallery walks and subterranean jazz kissa sessions.",
-    forecast: [
-      { date: "Day 1", maxTemp: 20, minTemp: 12, precipProb: 10, condition: "Clear Sky" },
-      { date: "Day 2", maxTemp: 19, minTemp: 11, precipProb: 20, condition: "Light Clouds" },
-      { date: "Day 3", maxTemp: 17, minTemp: 10, precipProb: 50, condition: "Evening Rain" },
-    ],
-  },
 };
+
+// Cabinet Office (内閣府) National Holidays Reference (kakar-satoshi/japan-holiday-mcp schema)
+const UPCOMING_JAPAN_HOLIDAYS = [
+  {
+    date: "2026-10-12",
+    nameJa: "スポーツの日",
+    nameEn: "Sports Day (Health & Sports Day)",
+    isThreeDayWeekend: true,
+    crowdImpact: "High domestic rail & shrine congestion 10:00–16:00",
+    afterHoursStrategy: "Shift Kyoto & Tokyo shrine visits to 06:30 Dawn or 18:00+ After-Hours charter.",
+  },
+  {
+    date: "2026-11-03",
+    nameJa: "文化の日",
+    nameEn: "Culture Day",
+    isThreeDayWeekend: false,
+    crowdImpact: "Peak autumn foliage crowds at public museums and daytime temples",
+    afterHoursStrategy: "Book private Nishijin textile studio & Daitoku-ji evening candlelit entry.",
+  },
+  {
+    date: "2026-11-23",
+    nameJa: "勤労感謝の日",
+    nameEn: "Labour Thanksgiving Day",
+    isThreeDayWeekend: true,
+    crowdImpact: "Peak Momiji 3-day weekend surge across Kyoto & Hakone",
+    afterHoursStrategy: "Route to Nagano Togakushi cedar valley or private Seochon hanok courtyard.",
+  },
+  {
+    date: "2027-01-01",
+    nameJa: "元日",
+    nameEn: "New Year's Day (Hatsumode)",
+    isThreeDayWeekend: true,
+    crowdImpact: "Major Hatsumode queues at famous shrines",
+    afterHoursStrategy: "Visit neighborhood clan shrines in Yanaka or private ryokan rotenburo.",
+  },
+  {
+    date: "2027-01-11",
+    nameJa: "成人の日",
+    nameEn: "Coming of Age Day",
+    isThreeDayWeekend: true,
+    crowdImpact: "Elevated Shinkansen & city center traffic",
+    afterHoursStrategy: "Reserve Green Car seats 30 days ahead & schedule twilight walking routes.",
+  },
+];
+
+// Gachi-Ramen Reference Database (eng213035/gachi-ramen schema)
+const SIMULATED_RAMEN_SHOPS = [
+  {
+    id: "rk_010482",
+    name: "Menya Inoichi Hanare (Backstreet Dashi Atelier)",
+    city: "Kyoto",
+    pref: "Kyoto",
+    keito: "Clear Shoyu / Wakayama & Rishiri Kelp Dashi",
+    neighborhood: "Shimogyo Backstreet (6 mins from Karasuma)",
+    hours: "17:30–22:30 (Best quiet window: 20:45)",
+    crowdNote: "Michelin Bib Gourmand lineage; 10 counter seats with zero tour groups",
+    signatureBowl: "A4 Wagyu & White Soy Kelp Broth Ramen with freshly grated yuzu peel",
+    data_as_of: "2026-10 (Simulated Reference — eng213035/gachi-ramen Schema)",
+  },
+  {
+    id: "rk_004918",
+    name: "Chuka Soba Kotetsu (Shimokitazawa Vinyl Alley)",
+    city: "Tokyo",
+    pref: "Tokyo",
+    keito: "Niboshi & Aged Tamari Shoyu",
+    neighborhood: "Setagaya · Shimokitazawa Backlane",
+    hours: "18:00–00:30 (Ideal after jazz kissa session)",
+    crowdNote: "95% local neighborhood musicians & vinyl collectors",
+    signatureBowl: "Charcoal-grilled chashu & hand-kneaded high-hydration bamboo-pressed noodles",
+    data_as_of: "2026-10 (Simulated Reference — eng213035/gachi-ramen Schema)",
+  },
+  {
+    id: "rk_029310",
+    name: "Shinshu Miso Kura-Men Takamura",
+    city: "Nagano",
+    pref: "Nagano",
+    keito: "3-Year Cedar-Barrel Aged Shinshu Miso",
+    neighborhood: "Obuse / Nagano Old Post Town Lane",
+    hours: "11:30–14:30, 17:30–21:00",
+    crowdNote: "Family-friendly tatami alcove available; warm refuge on snowy/rainy alpine days",
+    signatureBowl: "Roasted Shinshu miso broth topped with wild mountain bamboo shoots & buttered corn",
+    data_as_of: "2026-10 (Simulated Reference — eng213035/gachi-ramen Schema)",
+  },
+  {
+    id: "rk_041209",
+    name: "ramen_ya Kamo to Negi Ura-Roji",
+    city: "Tokyo",
+    pref: "Tokyo",
+    keito: "Pure Duck & Roasted Green Onion (Kamo Shoyu)",
+    neighborhood: "Ueno / Yanaka Border Backstreet",
+    hours: "17:00–23:00",
+    crowdNote: "Only 3 ingredients in broth (duck, water, heirloom negi); low crowd after 20:30",
+    signatureBowl: "Confit duck breast & charred White Senju negi in crystal duck consommé",
+    data_as_of: "2026-10 (Simulated Reference — eng213035/gachi-ramen Schema)",
+  },
+];
+
+// Tokyo Restroom, Live Train Status & Station Hazard Reference (eng213035/tokyo-restroom schema)
+const SIMULATED_STATION_COMFORT = [
+  {
+    station: "Shinjuku Station",
+    city: "Shinjuku-ku, Tokyo",
+    restrooms: [
+      {
+        location: "Tokyo Metro Marunouchi Line B1F · 11m from Exit A8",
+        gateAccess: "Outside Ticket Gates (Immediate Street Access)",
+        wheelchairAccessible: true,
+        diaperTable: true,
+        ostomate: true,
+        babyChair: true,
+        cleanlinessNote: "Newly renovated multipurpose suite; ideal for families & seniors.",
+      },
+      {
+        location: "JR South Gate Concourse 2F · Near Midori-no-Madoguchi",
+        gateAccess: "Inside Ticket Gates",
+        wheelchairAccessible: true,
+        diaperTable: true,
+        ostomate: true,
+        babyChair: true,
+        cleanlinessNote: "Wide stroller entry with automatic sliding door.",
+      },
+    ],
+    trainStatus: {
+      line: "JR Yamanote, Chuo & Narita Express / Metro Marunouchi",
+      status: "Normal Operation (On Schedule)",
+      crowdTip: "Use Car 1 or Car 11 after 19:30 for lowest passenger density.",
+    },
+    hazardAlert: {
+      jmaStatus: "No Active River Flood or Landslide Warnings",
+      elevationSafety: "High-ground concourse (37m ASL); designated rain shelter arcade.",
+    },
+  },
+  {
+    station: "Shibuya Station (The Tokyo Toilet Architectural Route)",
+    city: "Shibuya-ku, Tokyo",
+    restrooms: [
+      {
+        location: "Nabeshima Shoto Park & Jingumae Sanctuary Restrooms (Kengo Kuma / Tadao Ando)",
+        gateAccess: "Public Park / Outside Gates (8m walk along quiet backstreet)",
+        wheelchairAccessible: true,
+        diaperTable: true,
+        ostomate: true,
+        babyChair: true,
+        cleanlinessNote: "Architectural cedar-louvered pavilion maintained 3x daily by Nippon Foundation.",
+      },
+    ],
+    trainStatus: {
+      line: "Tokyo Metro Ginza, Hanzomon & Fukutoshin Lines",
+      status: "Normal Operation (On Schedule)",
+      crowdTip: "Use Exit B1 towards Aoyama/Shoto to bypass Hachiko Crossing crowds completely.",
+    },
+    hazardAlert: {
+      jmaStatus: "No Active JMA Weather Warnings",
+      elevationSafety: "Underground B2F drainage vault upgraded; use Hikarie elevator for step-free high ground.",
+    },
+  },
+  {
+    station: "Tokyo Station / Kanda Backstreet Corridor",
+    city: "Chiyoda-ku, Tokyo",
+    restrooms: [
+      {
+        location: "Marunouchi North Dome 1F Multipurpose Lounge & Kanda North Exit",
+        gateAccess: "Outside Ticket Gates (Step-Free Ground Level)",
+        wheelchairAccessible: true,
+        diaperTable: true,
+        ostomate: true,
+        babyChair: true,
+        cleanlinessNote: "Equipped with private nursing room, warm water washlet, and luggage space.",
+      },
+    ],
+    trainStatus: {
+      line: "Hokuriku & Tokaido Shinkansen (Nagano / Kyoto Corridors)",
+      status: "Normal Operation (On Schedule)",
+      crowdTip: "Enter via Marunouchi North Gate for direct elevator access to Shinkansen platforms.",
+    },
+    hazardAlert: {
+      jmaStatus: "No Active JMA Warnings",
+      elevationSafety: "All-weather underground connection to Otemachi & Marunouchi hotels.",
+    },
+  },
+];
 
 async function startServer() {
   const app = express();
@@ -157,7 +404,8 @@ async function startServer() {
       const authData = await createSmitheryOAuthUrl(origin);
       res.json(authData);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to initialize Smithery OAuth";
+      const message =
+        error instanceof Error ? error.message : "Failed to initialize Smithery OAuth";
       res.status(500).json({ error: message });
     }
   });
@@ -192,8 +440,8 @@ async function startServer() {
       res.send(`<!doctype html>
 <html>
   <body style="font-family: sans-serif; padding: 24px; background: #F8F7F4; color: #141413;">
-    <h3>Smithery MCP Endpoint Connected</h3>
-    <p>Authenticated with https://mcp.smithery.ai/linpeiyun-emily. This window will close automatically.</p>
+    <h3>Smithery MCP Connected</h3>
+    <p>Authenticated with https://mcp.smithery.ai/linpeiyun-emily. Closing window...</p>
     <script>
       if (window.opener) {
         window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS' }, '*');
@@ -223,253 +471,240 @@ async function startServer() {
 
   app.get(["/auth/callback", "/auth/callback/"], oauthCallbackHandler);
 
-  // 3. Disconnect / Reset Smithery OAuth Session
+  // 3. Disconnect Smithery OAuth Session
   app.post("/api/mcp/disconnect", (_req, res) => {
     clearActiveToken();
     res.json({ disconnected: true });
   });
 
-  // 4. Direct Tool Execution on https://mcp.smithery.ai/linpeiyun-emily
-  app.post("/api/mcp/call", async (req, res) => {
-    const { toolName, args = {} } = req.body || {};
-    if (!toolName) {
-      res.status(400).json({ error: "toolName is required" });
-      return;
-    }
-    try {
-      const result = await callSmitheryMcpTool(toolName, args);
-      res.json({
-        endpoint: MCP_ENDPOINT,
-        toolName,
-        executedAt: new Date().toISOString(),
-        result,
-      });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "MCP tool call failed";
-      res.status(400).json({ error: message });
-    }
-  });
-
-  // 5. Comprehensive MCP Status Endpoint (/api/mcp/status)
+  // 4. Lightweight Connection Status Check for Header Indicator
   app.get("/api/mcp/status", async (_req, res) => {
     const health = await checkMcpAndServicesHealth();
-    res.json({
-      endpoint: MCP_ENDPOINT,
-      wellKnownUrl: MCP_WELL_KNOWN,
-      checkedAt: health.timestamp,
-      httpStatus: health.mcpGateway.httpStatus,
-      authenticated: health.mcpGateway.authenticated,
-      hasServerKeyConfigured: health.mcpGateway.hasTokenConfigured,
-      latencyMs: health.mcpGateway.latencyMs,
-      wwwAuthenticateHeader: health.mcpGateway.wwwAuthenticate,
-      oauthResourceMetadata: health.mcpGateway.oauthDiscovery.metadata,
-      liveTools: health.mcpGateway.discoveredTools || [],
-      miroMappedTools: health.miroToolkitAssessment.map((item) => ({
-        id: item.id,
-        name: item.miroResource,
-        miroRole: item.miroPurpose,
-        appFeature: item.endpointToolMatched
-          ? `Bound to endpoint tool: ${item.endpointToolMatched}`
-          : "Mapped to UraMichi Itinerary, Stay, Season & Route Modules",
-        status: item.status,
-        dataMode: item.dataClassification,
-      })),
-    });
+    res.json(health);
   });
 
-  // 6. Seasonal & Weather Intelligence (Strictly uses Smithery MCP endpoint if available, else clearly labeled Simulated Seasonal Climatology)
-  app.get("/api/weather", async (req, res) => {
+  // 5. Seasons, Weather & National Holidays Endpoint
+  // Powered by haomingkoo/japan-seasons-mcp + kakar-satoshi/japan-holiday-mcp on https://mcp.smithery.ai/linpeiyun-emily
+  app.get("/api/seasons-holidays", async (req, res) => {
     const cityKey = String(req.query.city || "kyoto").toLowerCase();
-    const baseCity = SEASONAL_CLIMATOLOGY[cityKey] || SEASONAL_CLIMATOLOGY.kyoto;
+    const checkDate = String(req.query.date || "2026-11-03");
+    const baseData = SIMULATED_SEASONS_BY_CITY[cityKey] || SIMULATED_SEASONS_BY_CITY.kyoto;
 
-    // Check if Smithery MCP endpoint is authenticated and exposes a seasons/weather tool
-    const probe = await probeAndListMcpTools();
-    let mcpSeasonData: unknown = null;
-    let usedMcpTool: string | null = null;
+    const hasToken = Boolean(getActiveToken());
+    let liveWeatherOutput: unknown = null;
+    let liveKoyoOutput: unknown = null;
+    let liveHolidaysOutput: unknown = null;
+    let liveDateHolidayCheck: unknown = null;
+    let usedLiveMcp = false;
 
-    if (probe.authenticated && probe.tools.length > 0) {
-      const seasonTool = probe.tools.find((t: { name?: string; description?: string }) => {
-        const text = `${t.name || ""} ${t.description || ""}`.toLowerCase();
-        return (
-          text.includes("season") ||
-          text.includes("weather") ||
-          text.includes("japan") ||
-          text.includes("sakura") ||
-          text.includes("foliage")
-        );
-      });
-      if (seasonTool?.name) {
-        try {
-          mcpSeasonData = await callSmitheryMcpTool(seasonTool.name, {
-            city: baseCity.name,
-            location: baseCity.name,
-          });
-          usedMcpTool = seasonTool.name;
-        } catch (_e) {
-          mcpSeasonData = null;
+    if (hasToken) {
+      try {
+        const [weatherRes, koyoRes, nextHolRes, isHolRes] = await Promise.allSettled([
+          callSmitheryMcpTool("weather_forecast", { city: baseData.city }),
+          callSmitheryMcpTool("koyo_now", { region: baseData.city }),
+          callSmitheryMcpTool("get_next_holidays", { count: 5 }),
+          callSmitheryMcpTool("is_holiday", { date: checkDate }),
+        ]);
+
+        if (weatherRes.status === "fulfilled") {
+          liveWeatherOutput = weatherRes.value;
+          usedLiveMcp = true;
         }
+        if (koyoRes.status === "fulfilled") {
+          liveKoyoOutput = koyoRes.value;
+          usedLiveMcp = true;
+        }
+        if (nextHolRes.status === "fulfilled") {
+          liveHolidaysOutput = nextHolRes.value;
+          usedLiveMcp = true;
+        }
+        if (isHolRes.status === "fulfilled") {
+          liveDateHolidayCheck = isHolRes.value;
+          usedLiveMcp = true;
+        }
+      } catch (_e) {
+        usedLiveMcp = false;
       }
     }
 
+    const matchedHoliday = UPCOMING_JAPAN_HOLIDAYS.find((h) => h.date === checkDate) || null;
+
     res.json({
-      source: usedMcpTool
-        ? `Live Smithery MCP (${MCP_ENDPOINT} · ${usedMcpTool})`
-        : "Simulated Seasonal & Weather Reference Data (Connect Smithery MCP for Live Tool Feed)",
-      isLive: Boolean(usedMcpTool),
-      mcpToolOutput: mcpSeasonData,
-      city: baseCity.name,
-      country: baseCity.country,
-      seasonHighlight: baseCity.seasonHighlight,
+      source: usedLiveMcp
+        ? `Live Smithery MCP (${MCP_ENDPOINT} · japan-seasons-mcp & japan-holiday-mcp)`
+        : "Simulated Reference Data (haomingkoo/japan-seasons-mcp & kakar-satoshi/japan-holiday-mcp Schema)",
+      isLiveMcp: usedLiveMcp,
+      city: baseData.city,
+      country: baseData.country,
+      seasonHighlight: baseData.seasonHighlight,
+      koyoOrSakuraStatus: baseData.koyoOrSakuraStatus,
       current: {
-        tempC: baseCity.tempC,
-        feelsLikeC: baseCity.feelsLikeC,
-        windKph: baseCity.windKph,
-        condition: baseCity.condition,
-        isRainy: baseCity.isRainy,
-        advisory: baseCity.advisory,
+        tempC: baseData.tempC,
+        condition: baseData.condition,
+        isRainy: baseData.isRainy,
+        advisory: baseData.advisory,
       },
-      forecast: baseCity.forecast,
+      festivals: baseData.festivals,
+      fruitFarms: baseData.fruitFarms,
+      forecast: baseData.forecast,
+      holidayCheck: {
+        checkedDate: checkDate,
+        isNationalHoliday: Boolean(matchedHoliday),
+        holidayDetail: matchedHoliday,
+        upcomingHolidays: UPCOMING_JAPAN_HOLIDAYS,
+      },
+      liveMcpPayloads: usedLiveMcp
+        ? {
+            weather_forecast: liveWeatherOutput,
+            koyo_now: liveKoyoOutput,
+            get_next_holidays: liveHolidaysOutput,
+            is_holiday: liveDateHolidayCheck,
+          }
+        : null,
     });
   });
 
-  // 7. Hidden Gems Scout (Uses Smithery MCP search tool when authenticated + Gemini structuring)
-  app.post("/api/discover-gems", async (req, res) => {
-    const {
-      city = "Kyoto",
-      interest = "after-hours temples and hidden tea houses",
-      weatherMode = "clear",
-    } = req.body || {};
+  // 6. Gachi-Ramen Finder Endpoint (eng213035/gachi-ramen on https://mcp.smithery.ai/linpeiyun-emily)
+  app.get("/api/ramen", async (req, res) => {
+    const city = String(req.query.city || "ALL");
+    const keito = String(req.query.keito || "ALL");
+    const q = String(req.query.q || "").toLowerCase();
 
-    try {
-      const probe = await probeAndListMcpTools();
-      let mcpContextSnippet = "";
-      let usedMcpToolName: string | null = null;
+    const hasToken = Boolean(getActiveToken());
+    let liveRamenResult: unknown = null;
+    let usedLiveMcp = false;
 
-      if (probe.authenticated && probe.tools.length > 0) {
-        const searchTool = probe.tools.find((t: { name?: string; description?: string }) => {
-          const text = `${t.name || ""} ${t.description || ""}`.toLowerCase();
-          return (
-            text.includes("search") ||
-            text.includes("brave") ||
-            text.includes("perplexity") ||
-            text.includes("yelp") ||
-            text.includes("place")
-          );
-        });
-        if (searchTool?.name) {
-          try {
-            const mcpRes = await callSmitheryMcpTool(searchTool.name, {
-              query: `${city} hidden gems off the beaten path ${interest}`,
-              location: city,
-            });
-            mcpContextSnippet = JSON.stringify(mcpRes).slice(0, 3000);
-            usedMcpToolName = searchTool.name;
-          } catch (_e) {
-            // Continue with curated fallback
-          }
-        }
+    if (hasToken) {
+      try {
+        const mcpArgs: Record<string, unknown> = { limit: 6 };
+        if (city !== "ALL") mcpArgs.city = city;
+        if (keito !== "ALL") mcpArgs.keito = keito;
+        if (q) mcpArgs.q = q;
+        liveRamenResult = await callSmitheryMcpTool("search_ramen", mcpArgs);
+        usedLiveMcp = true;
+      } catch (_e) {
+        usedLiveMcp = false;
       }
-
-      const ai = getAiClient();
-      const prompt = `You are an insider Korea & Japan local travel curator for affluent, adventurous travellers who despise crowded tourist traps.
-Find 3 real, authentic, lesser-known or after-hours local spots in ${city} focused on: "${interest}".
-Weather condition to account for: ${
-        weatherMode === "rainy"
-          ? "Rainy weather — prioritize atmospheric indoor spaces, covered arcades, subterranean listening bars, or private tea sanctuaries"
-          : "Clear weather — include quiet twilight courtyards, backstreet walks, or early/after-hours access sights"
-      }.
-${
-  mcpContextSnippet
-    ? `Use this live data retrieved from our Smithery MCP endpoint (${usedMcpToolName}): ${mcpContextSnippet}`
-    : ""
-}
-
-Return a JSON array of 3 objects with these exact fields:
-- name (string): Real name of the spot or neighborhood enclave
-- neighborhood (string): Specific district in ${city}
-- bestTimeWindow (string): Exact time window to avoid crowds (e.g. "19:30–21:30 After-Hours" or "06:30 Dawn Window")
-- crowdComparison (string): Concrete contrast vs mainstream tourist equivalent
-- whyExtraordinary (string): 2 sentences on what makes it special and local
-- weatherFit (string): Why this spot works well in ${weatherMode} weather
-- localHostTip (string): Practical etiquette or insider tip`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                neighborhood: { type: Type.STRING },
-                bestTimeWindow: { type: Type.STRING },
-                crowdComparison: { type: Type.STRING },
-                whyExtraordinary: { type: Type.STRING },
-                weatherFit: { type: Type.STRING },
-                localHostTip: { type: Type.STRING },
-              },
-              required: [
-                "name",
-                "neighborhood",
-                "bestTimeWindow",
-                "crowdComparison",
-                "whyExtraordinary",
-                "weatherFit",
-                "localHostTip",
-              ],
-            },
-          },
-        },
-      });
-
-      const gems = JSON.parse(response.text || "[]");
-      res.json({
-        source: usedMcpToolName
-          ? `Live Smithery MCP (${usedMcpToolName}) + Gemini 3.8 Flash`
-          : "Simulated / AI-Curated Reference Discovery (Connect Smithery MCP for Live Endpoint Search)",
-        city,
-        interest,
-        weatherMode,
-        gems,
-      });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to scout hidden gems";
-      res.status(500).json({ error: message });
     }
+
+    const filtered = SIMULATED_RAMEN_SHOPS.filter((shop) => {
+      const matchCity = city === "ALL" || shop.city.toLowerCase() === city.toLowerCase();
+      const matchKeito =
+        keito === "ALL" || shop.keito.toLowerCase().includes(keito.toLowerCase());
+      const matchQ =
+        !q ||
+        shop.name.toLowerCase().includes(q) ||
+        shop.signatureBowl.toLowerCase().includes(q) ||
+        shop.neighborhood.toLowerCase().includes(q);
+      return matchCity && matchKeito && matchQ;
+    });
+
+    res.json({
+      source: usedLiveMcp
+        ? `Live Smithery MCP (${MCP_ENDPOINT} · eng213035/gachi-ramen)`
+        : "Simulated Reference Data (eng213035/gachi-ramen Schema — 62,144 Verified Shops DB)",
+      isLiveMcp: usedLiveMcp,
+      liveMcpPayload: liveRamenResult,
+      shops: filtered,
+    });
   });
 
-  // 8. Custom Itinerary Personalizer (Korea & Japan Focused)
+  // 7. Restroom, Family Accessibility, Live Train Status & Station Hazard Endpoint
+  // Powered by eng213035/tokyo-restroom on https://mcp.smithery.ai/linpeiyun-emily
+  app.get("/api/restrooms-transit", async (req, res) => {
+    const stationQuery = String(req.query.station || "Shinjuku").toLowerCase();
+    const filterDiaper = req.query.diaper === "true";
+    const filterWheelchair = req.query.wheelchair === "true";
+
+    const hasToken = Boolean(getActiveToken());
+    let liveToiletData: unknown = null;
+    let liveTrainData: unknown = null;
+    let liveAlertData: unknown = null;
+    let usedLiveMcp = false;
+
+    if (hasToken) {
+      try {
+        const [toiletRes, trainRes, alertRes] = await Promise.allSettled([
+          callSmitheryMcpTool("get_toilet_by_station", { station: stationQuery }),
+          callSmitheryMcpTool("get_train_status", { query: stationQuery }),
+          callSmitheryMcpTool("get_station_alerts", { station_name: stationQuery }),
+        ]);
+        if (toiletRes.status === "fulfilled") {
+          liveToiletData = toiletRes.value;
+          usedLiveMcp = true;
+        }
+        if (trainRes.status === "fulfilled") {
+          liveTrainData = trainRes.value;
+          usedLiveMcp = true;
+        }
+        if (alertRes.status === "fulfilled") {
+          liveAlertData = alertRes.value;
+          usedLiveMcp = true;
+        }
+      } catch (_e) {
+        usedLiveMcp = false;
+      }
+    }
+
+    const stations = SIMULATED_STATION_COMFORT.filter((s) =>
+      stationQuery === "all" ? true : s.station.toLowerCase().includes(stationQuery)
+    ).map((s) => ({
+      ...s,
+      restrooms: s.restrooms.filter((r) => {
+        if (filterDiaper && !r.diaperTable) return false;
+        if (filterWheelchair && !r.wheelchairAccessible) return false;
+        return true;
+      }),
+    }));
+
+    res.json({
+      source: usedLiveMcp
+        ? `Live Smithery MCP (${MCP_ENDPOINT} · eng213035/tokyo-restroom)`
+        : "Simulated Reference Data (eng213035/tokyo-restroom Schema — 526 Stations Open Data)",
+      isLiveMcp: usedLiveMcp,
+      liveMcpPayloads: usedLiveMcp
+        ? {
+            get_toilet_by_station: liveToiletData,
+            get_train_status: liveTrainData,
+            get_station_alerts: liveAlertData,
+          }
+        : null,
+      stations: stations.length > 0 ? stations : SIMULATED_STATION_COMFORT,
+    });
+  });
+
+  // 8. Custom Itinerary Personalizer (Combines Holiday Crowd Avoidance, Weather/Seasons, Family Restroom & Ramen preferences)
   app.post("/api/itinerary/personalize", async (req, res) => {
     const {
-      destination = "Kyoto & Nagano",
-      travelerType = "Couple / Duet",
+      destination = "Kyoto & Nagano (Japan)",
+      travelerType = "Multi-Generational Family (4–6 pax)",
+      travelDate = "2026-11-03",
       durationDays = 3,
-      pace = "Unhurried & Immersive",
-      weatherPreference = "Auto-Swap for Rain",
-      specialFocus = "After-hours temples, private artisan workshops, and subterranean vinyl bars",
+      weatherPreference = "Auto-Swap for Rain & Mist",
+      familyRestroomPriority = true,
+      ramenStylePreference = "Clear Shoyu / Dashi & Aged Shinshu Miso",
+      specialFocus = "After-hours temples, seasonal foliage, and private artisan workshops",
     } = req.body || {};
 
     try {
-      const probe = await probeAndListMcpTools();
-      let mcpToolsSummary = "Unauthenticated (Using Simulated Reference Pricing & Schedules)";
-      if (probe.authenticated && probe.tools.length > 0) {
-        mcpToolsSummary = `Connected to ${MCP_ENDPOINT} with tools: ${probe.tools
-          .map((t: { name?: string }) => t.name)
-          .join(", ")}`;
-      }
+      const holidayMatch = UPCOMING_JAPAN_HOLIDAYS.find((h) => h.date === travelDate);
+      const holidayContext = holidayMatch
+        ? `Travel starts on Japanese National Holiday ${holidayMatch.nameEn} (${holidayMatch.nameJa}, ${holidayMatch.date}). Apply strict after-hours & dawn crowd-avoidance routing.`
+        : `Travel starts on ${travelDate} (Non-holiday weekday/weekend window).`;
 
       const ai = getAiClient();
-      const prompt = `Create a bespoke ${durationDays}-day off-the-beaten-path itinerary in ${destination} for ${travelerType} (Pace: ${pace}).
-Key requirements from our Miro business proposal:
-1. Avoid crowded tourist traps — specify after-hours access windows or quiet local alternatives.
-2. Weather-aware planning (${weatherPreference}) — include a rainy-day indoor alternative for each day.
-3. Recommend the best transport route between stops and a curated neighborhood stay style.
-4. Pair with a local ground-up hobby group or vetted local host experience.
-5. Special focus requested: "${specialFocus}".
-MCP Endpoint Status: ${mcpToolsSummary}.
+      const prompt = `Create a bespoke ${durationDays}-day off-the-beaten-path itinerary in ${destination} for ${travelerType}.
+Business & MCP Toolkit Context:
+1. Holiday Crowd Check (japan-holiday-mcp): ${holidayContext}
+2. Seasonal & Weather Elements (japan-seasons-mcp): ${weatherPreference}. Include a rainy-weather indoor swap for each day, plus a seasonal foliage/blossom or fruit-picking highlight.
+3. Family Comfort, Safety & Transport (tokyo-restroom): ${
+        familyRestroomPriority
+          ? "Include step-free train station routing, accessible restroom / diaper table stop notes, and optimal low-crowd train cars."
+          : "Include optimal door-to-door regional rail and private taxi routing."
+      }
+4. Authentic Local Ramen & Dining (gachi-ramen): Recommend a verified backstreet local ramen shop matching "${ramenStylePreference}" away from tourist chains.
+5. Local Host Pairing: Connect with a fun local individual or ground-up hobby group.
+6. Traveller's personal focus: "${specialFocus}".
 
 Return structured JSON matching the schema.`;
 
@@ -483,8 +718,9 @@ Return structured JSON matching the schema.`;
             properties: {
               title: { type: Type.STRING },
               summary: { type: Type.STRING },
+              holidayCrowdAdvisory: { type: Type.STRING },
               recommendedStayArea: { type: Type.STRING },
-              transportStrategy: { type: Type.STRING },
+              transportAndStationComfort: { type: Type.STRING },
               estimatedDailyBudgetUsd: { type: Type.STRING },
               days: {
                 type: Type.ARRAY,
@@ -497,7 +733,8 @@ Return structured JSON matching the schema.`;
                     primaryExperience: { type: Type.STRING },
                     crowdAvoidanceTactic: { type: Type.STRING },
                     rainyWeatherSwap: { type: Type.STRING },
-                    transportRoute: { type: Type.STRING },
+                    ramenAndCulinaryStop: { type: Type.STRING },
+                    stationRestroomAndTransitNote: { type: Type.STRING },
                     localHostConnection: { type: Type.STRING },
                   },
                   required: [
@@ -507,7 +744,8 @@ Return structured JSON matching the schema.`;
                     "primaryExperience",
                     "crowdAvoidanceTactic",
                     "rainyWeatherSwap",
-                    "transportRoute",
+                    "ramenAndCulinaryStop",
+                    "stationRestroomAndTransitNote",
                     "localHostConnection",
                   ],
                 },
@@ -516,8 +754,9 @@ Return structured JSON matching the schema.`;
             required: [
               "title",
               "summary",
+              "holidayCrowdAdvisory",
               "recommendedStayArea",
-              "transportStrategy",
+              "transportAndStationComfort",
               "estimatedDailyBudgetUsd",
               "days",
             ],
@@ -543,7 +782,7 @@ Return structured JSON matching the schema.`;
     const {
       text = "",
       targetLang = "ja",
-      context = "Polite conversation with a local artisan host",
+      context = "Polite conversation with a local artisan host or ramen master",
     } = req.body || {};
     if (!text.trim()) {
       res.status(400).json({ error: "Please provide a phrase to translate." });

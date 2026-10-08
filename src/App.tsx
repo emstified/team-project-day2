@@ -1,23 +1,24 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { CURATED_ITINERARIES } from "./data/travelData";
 import { ItinerariesView } from "./components/ItinerariesView";
 import { CustomBuilderView, GeneratedCustomPlan } from "./components/CustomBuilderView";
+import { LocalScoutView } from "./components/LocalScoutView";
 import { LocalHostsView } from "./components/LocalHostsView";
 import { TranslateTtsView } from "./components/TranslateTtsView";
-import { ProposalMcpView } from "./components/ProposalMcpView";
 import {
   Compass,
   Sparkles,
+  Soup,
   Users,
   Languages,
-  FileCheck2,
   Briefcase,
   Trash2,
   CheckCircle2,
   X,
+  KeyRound,
 } from "lucide-react";
 
-type ActiveTab = "itineraries" | "builder" | "hosts" | "translate" | "architecture";
+type ActiveTab = "itineraries" | "builder" | "scout" | "hosts" | "translate";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("itineraries");
@@ -26,6 +27,10 @@ export default function App() {
   ]);
   const [savedCustomPlans, setSavedCustomPlans] = useState<GeneratedCustomPlan[]>([]);
   const [tripDrawerOpen, setTripDrawerOpen] = useState(false);
+
+  // Smithery MCP Live Connection State
+  const [mcpAuthenticated, setMcpAuthenticated] = useState(false);
+  const [oauthConnecting, setOauthConnecting] = useState(false);
 
   // End-to-End Concierge Hold Checkout State
   const [travelerName, setTravelerName] = useState("");
@@ -36,6 +41,58 @@ export default function App() {
   const [travelMonth, setTravelMonth] = useState("November 2026 (Autumn Foliage Window)");
   const [gratitudeTipUsd, setGratitudeTipUsd] = useState(30);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
+
+  const checkMcpAuthStatus = async () => {
+    try {
+      const res = await fetch("/api/health.js");
+      if (res.ok) {
+        const data = await res.json();
+        setMcpAuthenticated(Boolean(data?.gateway?.authenticated));
+      }
+    } catch (_e) {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    checkMcpAuthStatus();
+  }, []);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const origin = event.origin;
+      if (!origin.endsWith(".run.app") && !origin.includes("localhost")) {
+        return;
+      }
+      if (event.data?.type === "OAUTH_AUTH_SUCCESS") {
+        setOauthConnecting(false);
+        checkMcpAuthStatus();
+      } else if (event.data?.type === "OAUTH_AUTH_ERROR") {
+        setOauthConnecting(false);
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  const handleConnectSmitheryOAuth = async () => {
+    setOauthConnecting(true);
+    try {
+      const origin = window.location.origin;
+      const res = await fetch(`/api/mcp/oauth/url?origin=${encodeURIComponent(origin)}`);
+      const data = await res.json();
+      if (res.ok && data.url) {
+        const popup = window.open(data.url, "smithery_oauth_popup", "width=600,height=720");
+        if (!popup) {
+          setOauthConnecting(false);
+        }
+      } else {
+        setOauthConnecting(false);
+      }
+    } catch (_e) {
+      setOauthConnecting(false);
+    }
+  };
 
   const handleToggleSaveItinerary = (id: string) => {
     setBookingConfirmed(false);
@@ -66,7 +123,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F7F4] text-[#141413]">
-      {/* Top Bar Contract: Strictly 1 Row, 3 Zones (Brand Wordmark — 5 Nav Links — 1 Primary Action) */}
+      {/* Top Bar Contract: Strictly 1 Row, 3 Zones (Brand Wordmark — 5 Traveller Nav Links — 1 Primary Action) */}
       <header className="sticky top-0 z-30 h-14 bg-[#F8F7F4]/95 backdrop-blur-md border-b border-stone-200/90 px-4 sm:px-8 flex items-center justify-between">
         {/* Zone 1: Single text element wordmark */}
         <button
@@ -77,7 +134,7 @@ export default function App() {
           UraMichi
         </button>
 
-        {/* Zone 2: 5 clean text navigation links */}
+        {/* Zone 2: 5 clean traveller navigation links */}
         <nav
           aria-label="Primary Navigation"
           className="hidden md:flex items-center gap-7 text-sm font-medium text-stone-600"
@@ -86,9 +143,9 @@ export default function App() {
             [
               { id: "itineraries", label: "Itineraries" },
               { id: "builder", label: "Custom Builder" },
+              { id: "scout", label: "Ramen & Comfort" },
               { id: "hosts", label: "Local Hosts" },
               { id: "translate", label: "Voice Translate" },
-              { id: "architecture", label: "Proposal & MCP" },
             ] as const
           ).map((item) => (
             <button
@@ -119,7 +176,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Content Container (1440px Desktop Baseline, Mobile Responsive) */}
+      {/* Main Content Container */}
       <main className="flex-1 w-full max-w-[1240px] mx-auto px-4 sm:px-8 pt-6 pb-24 md:pb-16">
         {activeTab === "itineraries" && (
           <ItinerariesView
@@ -139,16 +196,14 @@ export default function App() {
           />
         )}
 
+        {activeTab === "scout" && <LocalScoutView />}
+
         {activeTab === "hosts" && <LocalHostsView />}
 
         {activeTab === "translate" && <TranslateTtsView />}
-
-        {activeTab === "architecture" && (
-          <ProposalMcpView onNavigateTab={(tab) => setActiveTab(tab)} />
-        )}
       </main>
 
-      {/* Quiet Editorial Footer */}
+      {/* Quiet Editorial Footer with Smithery MCP Live Auth Trigger */}
       <footer className="border-t border-stone-200/90 bg-white py-8 px-4 sm:px-8 mb-16 md:mb-0">
         <div className="max-w-[1240px] mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-stone-500">
           <div>
@@ -159,21 +214,32 @@ export default function App() {
               Korea &amp; Japan Off-the-Beaten-Path &amp; After-Hours Travel Concierge · Simulated Reference Pricing Disclosed
             </span>
           </div>
-          <div className="flex flex-wrap items-center gap-5">
-            <button
-              type="button"
-              onClick={() => setActiveTab("architecture")}
+          <div className="flex flex-wrap items-center gap-4">
+            {!mcpAuthenticated ? (
+              <button
+                type="button"
+                onClick={handleConnectSmitheryOAuth}
+                disabled={oauthConnecting}
+                className="min-h-[36px] px-3 py-1.5 text-xs font-medium text-stone-700 bg-[#F8F7F4] border border-stone-300 rounded-lg hover:bg-stone-100 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <KeyRound className="w-3.5 h-3.5 text-[#1E3A5F]" />
+                <span>
+                  {oauthConnecting ? "Connecting Smithery MCP..." : "Authorize Live Smithery MCP"}
+                </span>
+              </button>
+            ) : (
+              <span className="text-emerald-800 font-medium">
+                Smithery MCP Connected (linpeiyun-emily)
+              </span>
+            )}
+            <a
+              href="/api/health.js"
+              target="_blank"
+              rel="noopener noreferrer"
               className="hover:text-stone-900 underline underline-offset-4"
             >
-              Miro Proposal &amp; MCP Verification Report
-            </button>
-            <button
-              type="button"
-              onClick={() => setTripDrawerOpen(true)}
-              className="hover:text-stone-900 underline underline-offset-4"
-            >
-              Open Saved Trip Brief ({totalSavedCount})
-            </button>
+              MCP Health Monitor (/api/health.js)
+            </a>
           </div>
         </div>
       </footer>
@@ -187,9 +253,9 @@ export default function App() {
           [
             { id: "itineraries", label: "Routes", icon: Compass },
             { id: "builder", label: "Builder", icon: Sparkles },
+            { id: "scout", label: "Ramen/WC", icon: Soup },
             { id: "hosts", label: "Hosts", icon: Users },
             { id: "translate", label: "Translate", icon: Languages },
-            { id: "architecture", label: "Miro/MCP", icon: FileCheck2 },
           ] as const
         ).map((tab) => {
           const IconComponent = tab.icon;
@@ -285,7 +351,7 @@ export default function App() {
                   >
                     <div className="space-y-1">
                       <p className="text-xs text-[#1E3A5F] font-medium">
-                        AI Personalised Route · {plan.days.length} Days
+                        Personalised Route · {plan.days.length} Days
                       </p>
                       <h3 className="text-sm font-semibold text-stone-900">{plan.title}</h3>
                       <p className="text-xs text-stone-600">

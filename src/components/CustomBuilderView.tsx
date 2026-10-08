@@ -1,5 +1,16 @@
 import React, { useState } from "react";
-import { Compass, Sparkles, CloudRain, Sun, Train, Home, Users, Check } from "lucide-react";
+import {
+  Compass,
+  Sparkles,
+  CloudRain,
+  Sun,
+  Train,
+  Home,
+  Users,
+  Check,
+  Soup,
+  Calendar,
+} from "lucide-react";
 
 interface GeneratedDay {
   dayNumber: number;
@@ -8,27 +19,19 @@ interface GeneratedDay {
   primaryExperience: string;
   crowdAvoidanceTactic: string;
   rainyWeatherSwap: string;
-  transportRoute: string;
+  ramenAndCulinaryStop: string;
+  stationRestroomAndTransitNote: string;
   localHostConnection: string;
 }
 
 export interface GeneratedCustomPlan {
   title: string;
   summary: string;
+  holidayCrowdAdvisory: string;
   recommendedStayArea: string;
-  transportStrategy: string;
+  transportAndStationComfort: string;
   estimatedDailyBudgetUsd: string;
   days: GeneratedDay[];
-}
-
-interface DiscoveredGem {
-  name: string;
-  neighborhood: string;
-  bestTimeWindow: string;
-  crowdComparison: string;
-  whyExtraordinary: string;
-  weatherFit: string;
-  localHostTip: string;
 }
 
 interface CustomBuilderViewProps {
@@ -37,26 +40,22 @@ interface CustomBuilderViewProps {
 
 export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCustomPlan }) => {
   const [destination, setDestination] = useState("Kyoto & Nagano (Japan)");
-  const [travelerType, setTravelerType] = useState("Couple / Duet");
+  const [travelerType, setTravelerType] = useState("Multi-Generational Family (4–6 pax)");
+  const [travelDate, setTravelDate] = useState("2026-11-03");
   const [durationDays, setDurationDays] = useState(3);
-  const [pace, setPace] = useState("Unhurried & Immersive");
   const [weatherPreference, setWeatherPreference] = useState("Auto-Swap for Rain & Mist");
+  const [familyRestroomPriority, setFamilyRestroomPriority] = useState(true);
+  const [ramenStylePreference, setRamenStylePreference] = useState(
+    "Clear Shoyu / Kelp Dashi & Aged Shinshu Miso"
+  );
   const [specialFocus, setSpecialFocus] = useState(
-    "After-hours temple sanctuaries, private ceramic or tea ateliers, and hidden vinyl listening bars"
+    "After-hours temple sanctuaries, autumn maple foliage, and private ceramic or tea ateliers"
   );
 
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [customPlan, setCustomPlan] = useState<GeneratedCustomPlan | null>(null);
   const [planSaved, setPlanSaved] = useState(false);
-
-  // Hidden Gems Scout state (Brave Search / Perplexity MCP role)
-  const [scoutCity, setScoutCity] = useState("Kyoto");
-  const [scoutInterest, setScoutInterest] = useState("After-hours sanctuaries & artisan workshops");
-  const [scoutWeather, setScoutWeather] = useState<"clear" | "rainy">("clear");
-  const [scouting, setScouting] = useState(false);
-  const [scoutError, setScoutError] = useState<string | null>(null);
-  const [discoveredGems, setDiscoveredGems] = useState<DiscoveredGem[]>([]);
 
   const handleGeneratePlan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,9 +69,11 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
         body: JSON.stringify({
           destination,
           travelerType,
+          travelDate,
           durationDays,
-          pace,
           weatherPreference,
+          familyRestroomPriority,
+          ramenStylePreference,
           specialFocus,
         }),
       });
@@ -86,30 +87,6 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
     }
   };
 
-  const handleScoutGems = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setScouting(true);
-    setScoutError(null);
-    try {
-      const res = await fetch("/api/discover-gems", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          city: scoutCity,
-          interest: scoutInterest,
-          weatherMode: scoutWeather,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to scout hidden gems");
-      setDiscoveredGems(data.gems || []);
-    } catch (err: unknown) {
-      setScoutError(err instanceof Error ? err.message : "Failed to scout hidden gems");
-    } finally {
-      setScouting(false);
-    }
-  };
-
   return (
     <div className="space-y-12 pb-12">
       {/* Header */}
@@ -118,10 +95,10 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
           Personalised Curation · Individuals, Couples &amp; Multi-Generational Families
         </p>
         <h1 className="font-serif-display text-3xl md:text-4xl font-semibold text-stone-900 tracking-tight">
-          Bespoke Itinerary Architect &amp; Live Hidden Gem Scout
+          Bespoke Itinerary Architect
         </h1>
         <p className="mt-3 text-sm md:text-base text-stone-600 max-w-3xl leading-relaxed">
-          Design a custom Korea or Japan route that pairs after-hours sight access with weather-resilient indoor alternatives, optimal regional transport, and local hobby groups.
+          Design a custom Korea or Japan journey that accounts for national holiday crowds, seasonal foliage &amp; weather swaps, station restroom/step-free comfort, backstreet ramen stops, and local hobby hosts.
         </p>
       </div>
 
@@ -149,8 +126,8 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
               className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-[#F8F7F4] border border-stone-300 rounded-xl text-stone-900 focus:outline-none focus:border-[#1E3A5F]"
             >
               <option value="Kyoto & Nagano (Japan)">Kyoto &amp; Nagano Alpine Valley (Japan)</option>
+              <option value="Tokyo Backstreets & Yanaka (Japan)">Tokyo Backstreets &amp; Yanaka (Japan)</option>
               <option value="Seoul Seochon & Jeju Island (South Korea)">Seoul Seochon &amp; Jeju Island (South Korea)</option>
-              <option value="Tokyo Backstreets & Kamakura Twilight (Japan)">Tokyo Backstreets &amp; Kamakura Twilight (Japan)</option>
               <option value="Seoul to Kyoto Cross-Strait Dual Journey">Seoul to Kyoto Cross-Strait Dual Journey</option>
             </select>
           </div>
@@ -186,25 +163,26 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
                 <option value={2}>2 Days (Weekend Immersion)</option>
                 <option value={3}>3 Days (Signature Escape)</option>
                 <option value={4}>4 Days (Deep Regional Circuit)</option>
-                <option value={5}>5 Days (Grand Backstreet Crossing)</option>
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label htmlFor="pace-select" className="block text-xs font-medium text-stone-700">
-                Daily Rhythm
+              <label htmlFor="travel-date" className="block text-xs font-medium text-stone-700">
+                Arrival Date (Holiday Check)
               </label>
               <select
-                id="pace-select"
-                value={pace}
-                onChange={(e) => setPace(e.target.value)}
-                className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-[#F8F7F4] border border-stone-300 rounded-xl text-stone-900 focus:outline-none focus:border-[#1E3A5F]"
+                id="travel-date"
+                value={travelDate}
+                onChange={(e) => setTravelDate(e.target.value)}
+                className="w-full min-h-[44px] px-3.5 py-2 text-xs font-mono bg-[#F8F7F4] border border-stone-300 rounded-xl text-stone-900"
               >
-                <option value="Unhurried & Immersive">Unhurried &amp; Immersive</option>
-                <option value="Twilight & After-Hours Focused">Twilight &amp; After-Hours Focused</option>
-                <option value="Active Trail & Foraging">Active Trail &amp; Foraging</option>
+                <option value="2026-10-12">2026-10-12 (Sports Day Holiday)</option>
+                <option value="2026-10-20">2026-10-20 (Quiet Weekday)</option>
+                <option value="2026-11-03">2026-11-03 (Culture Day Holiday)</option>
+                <option value="2026-11-15">2026-11-15 (Mid-Nov Foliage)</option>
+                <option value="2026-11-23">2026-11-23 (Labour Thanksgiving)</option>
               </select>
             </div>
 
@@ -216,7 +194,7 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
                 id="weather-pref"
                 value={weatherPreference}
                 onChange={(e) => setWeatherPreference(e.target.value)}
-                className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-[#F8F7F4] border border-stone-300 rounded-xl text-stone-900 focus:outline-none focus:border-[#1E3A5F]"
+                className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-[#F8F7F4] border border-stone-300 rounded-xl text-stone-900"
               >
                 <option value="Auto-Swap for Rain & Mist">Auto-Swap for Rain &amp; Mist</option>
                 <option value="All-Weather Outdoor & Onsen">All-Weather Outdoor &amp; Onsen</option>
@@ -226,16 +204,49 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
           </div>
 
           <div className="space-y-1.5">
+            <label htmlFor="ramen-pref" className="block text-xs font-medium text-stone-700">
+              Backstreet Ramen &amp; Local Culinary Preference
+            </label>
+            <select
+              id="ramen-pref"
+              value={ramenStylePreference}
+              onChange={(e) => setRamenStylePreference(e.target.value)}
+              className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-[#F8F7F4] border border-stone-300 rounded-xl text-stone-900"
+            >
+              <option value="Clear Shoyu / Kelp Dashi & Aged Shinshu Miso">
+                Clear Shoyu / Kelp Dashi &amp; Aged Shinshu Miso
+              </option>
+              <option value="Duck & Heirloom Negi (Kamo Shoyu)">
+                Duck &amp; Heirloom Negi (Kamo Shoyu)
+              </option>
+              <option value="Artisanal Niboshi & Late-Night Craft Ramen">
+                Artisanal Niboshi &amp; Late-Night Craft Ramen
+              </option>
+            </select>
+          </div>
+
+          <label className="flex items-start gap-2.5 p-3 bg-[#F8F7F4] border border-stone-200 rounded-xl cursor-pointer text-xs text-stone-700">
+            <input
+              type="checkbox"
+              checked={familyRestroomPriority}
+              onChange={(e) => setFamilyRestroomPriority(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-[#1E3A5F]"
+            />
+            <span>
+              <strong>Include Family &amp; Accessibility Station Notes:</strong> Highlight step-free train exits, wheelchair/stroller gates, and accessible multipurpose restrooms along each route.
+            </span>
+          </label>
+
+          <div className="space-y-1.5">
             <label htmlFor="special-focus" className="block text-xs font-medium text-stone-700">
-              Personal Likes, Dietary Needs &amp; Hobby Interests
+              Personal Likes &amp; Hobby Interests
             </label>
             <textarea
               id="special-focus"
-              rows={3}
+              rows={2}
               value={specialFocus}
               onChange={(e) => setSpecialFocus(e.target.value)}
-              placeholder="e.g., Travelling with parents who love ceramics, quiet tea rooms, zero steep stairs, and private evening temple access..."
-              className="w-full p-3.5 text-sm bg-[#F8F7F4] border border-stone-300 rounded-xl text-stone-900 focus:outline-none focus:border-[#1E3A5F]"
+              className="w-full p-3.5 text-sm bg-[#F8F7F4] border border-stone-300 rounded-xl text-stone-900"
             />
           </div>
 
@@ -247,7 +258,7 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
             <Sparkles className="w-4 h-4 shrink-0" />
             <span>
               {generatingPlan
-                ? "Curating Weather-Adaptive Route..."
+                ? "Curating Weather & Holiday-Smart Route..."
                 : "Generate Personalised Itinerary"}
             </span>
           </button>
@@ -268,7 +279,7 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
                 Ready to Architect Your Off-the-Beaten-Path Journey
               </h3>
               <p className="text-sm text-stone-600 max-w-lg mx-auto leading-relaxed">
-                Select your Korea or Japan corridor, traveller profile, and personal interests on the left. Our server-side curator will generate a day-by-day schedule complete with crowd-avoidance windows, rainy-weather swaps, transport routing, and local hobby host pairings.
+                Configure your corridor, arrival date, weather handling, and ramen/station comfort preferences on the left to generate a bespoke day-by-day route.
               </p>
             </div>
           )}
@@ -276,7 +287,7 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
           {generatingPlan && (
             <div className="bg-white border border-stone-200/90 rounded-2xl p-8 space-y-4">
               <p className="text-xs font-mono text-stone-500">
-                Synthesizing after-hours windows, regional rail links &amp; rainy-day sanctuary swaps...
+                Checking holiday crowd windows, seasonal foliage, backstreet ramen stops &amp; station accessibility...
               </p>
               <div className="h-6 w-2/3 bg-stone-200/70 rounded animate-pulse" />
               <div className="h-4 w-full bg-stone-100 rounded animate-pulse" />
@@ -311,6 +322,14 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
                 </button>
               </div>
 
+              <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-950 flex items-start gap-2">
+                <Calendar className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Holiday &amp; Crowd Timing Advisory:</strong>{" "}
+                  {customPlan.holidayCrowdAdvisory}
+                </span>
+              </div>
+
               {/* Stay & Transport Summary */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b border-stone-100 text-xs">
                 <div className="space-y-1">
@@ -323,9 +342,11 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
                 <div className="space-y-1">
                   <div className="flex items-center gap-1.5 text-stone-500">
                     <Train className="w-3.5 h-3.5 text-[#1E3A5F]" />
-                    <span>Optimal Transport Strategy</span>
+                    <span>Transit &amp; Station Comfort</span>
                   </div>
-                  <p className="font-medium text-stone-900">{customPlan.transportStrategy}</p>
+                  <p className="font-medium text-stone-900">
+                    {customPlan.transportAndStationComfort}
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center gap-1.5 text-stone-500">
@@ -360,19 +381,28 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
                       <div className="p-3 bg-[#F8F7F4] rounded-xl space-y-1">
                         <div className="flex items-center gap-1.5 font-medium text-stone-900">
                           <Sun className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                          <span>Crowd Avoidance &amp; Transport</span>
+                          <span>Crowd Avoidance &amp; Station Comfort</span>
                         </div>
                         <p className="text-stone-600 leading-relaxed">{day.crowdAvoidanceTactic}</p>
-                        <p className="text-stone-500 pt-1">Route: {day.transportRoute}</p>
+                        <p className="text-stone-500 pt-1">
+                          Transit &amp; Restroom Note: {day.stationRestroomAndTransitNote}
+                        </p>
                       </div>
                       <div className="p-3 bg-[#F8F7F4] rounded-xl space-y-1">
                         <div className="flex items-center gap-1.5 font-medium text-stone-900">
                           <CloudRain className="w-3.5 h-3.5 text-[#1E3A5F] shrink-0" />
-                          <span>Rainy-Weather Sanctuary Swap</span>
+                          <span>Rainy-Weather Swap &amp; Local Host</span>
                         </div>
                         <p className="text-stone-600 leading-relaxed">{day.rainyWeatherSwap}</p>
                         <p className="text-stone-500 pt-1">Local Host: {day.localHostConnection}</p>
                       </div>
+                    </div>
+                    <div className="p-3 bg-[#F8F7F4] rounded-xl flex items-start gap-2 text-xs text-stone-700">
+                      <Soup className="w-4 h-4 text-[#B93829] shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Verified Local Ramen / Culinary Pairing:</strong>{" "}
+                        {day.ramenAndCulinaryStop}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -381,125 +411,6 @@ export const CustomBuilderView: React.FC<CustomBuilderViewProps> = ({ onSaveCust
           )}
         </div>
       </div>
-
-      {/* Live Hidden Gem Scout (Brave Search / Perplexity MCP Feature) */}
-      <section aria-labelledby="scout-heading" className="bg-white border border-stone-200/90 rounded-2xl p-6 md:p-8 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-stone-200 pb-5">
-          <div>
-            <p className="text-xs text-stone-500">
-              Miro Key Resource: Brave Search / Perplexity MCP Equivalent · Off-the-Beaten-Path Scout
-            </p>
-            <h2 id="scout-heading" className="font-serif-display text-2xl font-semibold text-stone-900 mt-1">
-              02. Live Hidden Enclave &amp; After-Hours Spot Scout
-            </h2>
-            <p className="text-sm text-stone-600 mt-1">
-              Discover uncrowded neighborhood sanctuaries, independent ateliers, and twilight access spots across Japan and South Korea.
-            </p>
-          </div>
-        </div>
-
-        <form onSubmit={handleScoutGems} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-          <div className="md:col-span-3 space-y-1.5">
-            <label htmlFor="scout-city" className="block text-xs font-medium text-stone-700">
-              City / Region
-            </label>
-            <select
-              id="scout-city"
-              value={scoutCity}
-              onChange={(e) => setScoutCity(e.target.value)}
-              className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-[#F8F7F4] border border-stone-300 rounded-xl text-stone-900"
-            >
-              <option value="Kyoto">Kyoto (Japan)</option>
-              <option value="Tokyo">Tokyo (Japan)</option>
-              <option value="Nagano">Nagano (Japan)</option>
-              <option value="Seoul">Seoul (South Korea)</option>
-              <option value="Jeju Island">Jeju Island (South Korea)</option>
-              <option value="Busan">Busan (South Korea)</option>
-            </select>
-          </div>
-
-          <div className="md:col-span-5 space-y-1.5">
-            <label htmlFor="scout-interest" className="block text-xs font-medium text-stone-700">
-              Specific Micro-Interest or Hobby
-            </label>
-            <input
-              id="scout-interest"
-              type="text"
-              value={scoutInterest}
-              onChange={(e) => setScoutInterest(e.target.value)}
-              placeholder="e.g., subterranean jazz kissa, hanok tea rooms, late-night shrines"
-              className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-[#F8F7F4] border border-stone-300 rounded-xl text-stone-900"
-            />
-          </div>
-
-          <div className="md:col-span-2 space-y-1.5">
-            <span className="block text-xs font-medium text-stone-700">Weather Filter</span>
-            <div className="flex items-center p-1 bg-[#F8F7F4] border border-stone-300 rounded-xl min-h-[44px]">
-              <button
-                type="button"
-                onClick={() => setScoutWeather("clear")}
-                className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
-                  scoutWeather === "clear" ? "bg-white text-stone-900 shadow-xs" : "text-stone-600"
-                }`}
-              >
-                Clear
-              </button>
-              <button
-                type="button"
-                onClick={() => setScoutWeather("rainy")}
-                className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
-                  scoutWeather === "rainy" ? "bg-white text-stone-900 shadow-xs" : "text-stone-600"
-                }`}
-              >
-                Rainy
-              </button>
-            </div>
-          </div>
-
-          <div className="md:col-span-2">
-            <button
-              type="submit"
-              disabled={scouting}
-              className="w-full min-h-[44px] px-4 py-2 text-xs font-medium bg-stone-900 text-white rounded-xl hover:bg-stone-800 transition-colors whitespace-nowrap disabled:opacity-60"
-            >
-              {scouting ? "Scouting..." : "Scout Gems"}
-            </button>
-          </div>
-        </form>
-
-        {scoutError && (
-          <p className="text-sm text-red-700">{scoutError}</p>
-        )}
-
-        {discoveredGems.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
-            {discoveredGems.map((gem, idx) => (
-              <div key={idx} className="p-5 bg-[#F8F7F4] rounded-xl space-y-2.5 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs text-stone-500">
-                    <span>{gem.neighborhood}</span>
-                    <span aria-hidden="true">·</span>
-                    <span className="font-mono">{gem.bestTimeWindow}</span>
-                  </div>
-                  <h3 className="font-serif-display text-xl font-semibold text-stone-900">
-                    0{idx + 1}. {gem.name}
-                  </h3>
-                  <p className="text-xs text-[#B93829] font-medium">
-                    {gem.crowdComparison}
-                  </p>
-                  <p className="text-sm text-stone-700 leading-relaxed">
-                    {gem.whyExtraordinary}
-                  </p>
-                </div>
-                <div className="pt-3 border-t border-stone-200/80 text-xs text-stone-600 space-y-1">
-                  <p><strong className="text-stone-900">Weather Fit:</strong> {gem.weatherFit}</p>
-                  <p><strong className="text-stone-900">Insider Tip:</strong> {gem.localHostTip}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 };

@@ -8,13 +8,68 @@ export const OAUTH_REGISTER_URL = "https://connect-auth.smithery.ai/register";
 export const OAUTH_AUTHORIZE_URL = "https://connect-auth.smithery.ai/authorize";
 export const OAUTH_TOKEN_URL = "https://connect-auth.smithery.ai/token";
 
-// Server-side in-memory store for OAuth PKCE states and active Smithery MCP token/session
+export const ATTACHED_MCP_SERVERS = [
+  {
+    id: "eng213035/gachi-ramen",
+    displayName: "gachi-ramen (Nationwide Verified Ramen DB)",
+    tools: ["search_ramen", "get_ramen_shop", "get_ramen_changes"],
+    miroAlignment:
+      "Hidden local culinary spots away from tourist traps; pairs with local ramen hobby groups.",
+  },
+  {
+    id: "eng213035/tokyo-restroom",
+    displayName: "Tokyo Restroom, Live Train Status & Station Safety",
+    tools: [
+      "get_toilet_by_station",
+      "get_public_toilet_by_city",
+      "get_train_status",
+      "get_station_hazard",
+      "get_active_alerts",
+      "get_station_alerts",
+      "get_municipality_context",
+      "get_station_context",
+    ],
+    miroAlignment:
+      "Safe local experience, family/individual comfort (wheelchair & baby diaper tables), live transport route status, and JMA weather hazard alerts.",
+  },
+  {
+    id: "haomingkoo/japan-seasons-mcp",
+    displayName: "Japan in Seasons (Sakura, Autumn Koyo, Weather & Festivals)",
+    tools: [
+      "japan_seasonal_answer",
+      "sakura_now",
+      "koyo_now",
+      "sakura_forecast",
+      "sakura_spots",
+      "sakura_best_dates",
+      "koyo_forecast",
+      "koyo_spots",
+      "koyo_best_dates",
+      "weather_forecast",
+      "flowers_spots",
+      "fruit_seasons",
+      "fruit_farms",
+      "festivals_list",
+      "search",
+      "fetch",
+    ],
+    miroAlignment:
+      "Cherry blossoms, autumn foliage, festivals, seasonal fruit farms, and short-range weather elements considered when itinerary is suggested.",
+  },
+  {
+    id: "kakar-satoshi/japan-holiday-mcp",
+    displayName: "Japan Holiday MCP (Cabinet Office National Holidays)",
+    tools: ["ping", "is_holiday", "get_holidays_in_month", "get_next_holidays"],
+    miroAlignment:
+      "Detects Japanese national holidays & peak domestic travel dates so itineraries shift sights to after-hours windows to avoid crowds.",
+  },
+];
+
 const pendingOAuthStates = new Map();
 let activeAccessToken = process.env.SMITHERY_API_KEY || "";
 let activeRefreshToken = "";
 let cachedDiscoveredTools = [];
 let lastVerifiedAt = null;
-let lastHttpStatus = 401;
 
 function base64UrlEncode(buffer) {
   return buffer
@@ -24,9 +79,6 @@ function base64UrlEncode(buffer) {
     .replace(/=+$/, "");
 }
 
-/**
- * Parses either a standard JSON response or an SSE (text/event-stream) payload from an MCP Streamable HTTP endpoint.
- */
 async function parseMcpResponse(response) {
   const contentType = response.headers.get("content-type") || "";
   const rawText = await response.text();
@@ -40,7 +92,7 @@ async function parseMcpResponse(response) {
           try {
             return JSON.parse(dataStr);
           } catch (_e) {
-            // Continue scanning SSE data lines
+            // Continue scanning SSE stream
           }
         }
       }
@@ -71,9 +123,6 @@ export function clearActiveToken() {
   cachedDiscoveredTools = [];
 }
 
-/**
- * Registers a dynamic OAuth 2.0 client with Smithery Connect Auth and generates a PKCE authorization URL.
- */
 export async function createSmitheryOAuthUrl(origin) {
   const cleanOrigin = (origin || process.env.APP_URL || "http://localhost:3000").replace(
     /\/+$/,
@@ -81,12 +130,11 @@ export async function createSmitheryOAuthUrl(origin) {
   );
   const redirectUri = `${cleanOrigin}/auth/callback`;
 
-  // 1. Dynamic Client Registration (RFC 7591)
   const regRes = await fetch(OAUTH_REGISTER_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      client_name: "UraMichi Travel Concierge (MCP Client)",
+      client_name: "UraMichi Travel Concierge",
       redirect_uris: [redirectUri],
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
@@ -102,7 +150,6 @@ export async function createSmitheryOAuthUrl(origin) {
   const clientData = await regRes.json();
   const clientId = clientData.client_id;
 
-  // 2. Generate PKCE verifier & S256 challenge
   const codeVerifier = base64UrlEncode(crypto.randomBytes(32));
   const codeChallenge = base64UrlEncode(
     crypto.createHash("sha256").update(codeVerifier).digest()
@@ -134,9 +181,6 @@ export async function createSmitheryOAuthUrl(origin) {
   };
 }
 
-/**
- * Exchanges the authorization code for a Bearer token at https://connect-auth.smithery.ai/token
- */
 export async function exchangeSmitheryOAuthCode(code, state) {
   const session = pendingOAuthStates.get(state);
   if (!session) {
@@ -172,9 +216,6 @@ export async function exchangeSmitheryOAuthCode(code, state) {
   return tokenData;
 }
 
-/**
- * Probes https://mcp.smithery.ai/linpeiyun-emily via MCP JSON-RPC (initialize + tools/list)
- */
 export async function probeAndListMcpTools() {
   const startMs = Date.now();
   const token = getActiveToken();
@@ -211,7 +252,6 @@ export async function probeAndListMcpTools() {
     });
 
     httpStatus = initRes.status;
-    lastHttpStatus = httpStatus;
     wwwAuthenticate = initRes.headers.get("www-authenticate") || "";
     reachable = initRes.ok || initRes.status === 401;
     const sessionId = initRes.headers.get("mcp-session-id");
@@ -226,7 +266,6 @@ export async function probeAndListMcpTools() {
         sessionHeaders["mcp-session-id"] = sessionId;
       }
 
-      // Send initialized notification
       await fetch(MCP_ENDPOINT, {
         method: "POST",
         headers: sessionHeaders,
@@ -236,7 +275,6 @@ export async function probeAndListMcpTools() {
         }),
       }).catch(() => {});
 
-      // Fetch available tools from https://mcp.smithery.ai/linpeiyun-emily
       const toolsRes = await fetch(MCP_ENDPOINT, {
         method: "POST",
         headers: sessionHeaders,
@@ -261,7 +299,6 @@ export async function probeAndListMcpTools() {
   const latencyMs = Date.now() - startMs;
   lastVerifiedAt = new Date().toISOString();
 
-  // Also check OAuth protected resource metadata
   let oauthMetadata = null;
   let wellKnownReachable = false;
   const wkStart = Date.now();
@@ -288,6 +325,7 @@ export async function probeAndListMcpTools() {
     wwwAuthenticate,
     serverInfo,
     tools,
+    attachedServers: ATTACHED_MCP_SERVERS,
     oauthDiscovery: {
       wellKnownUrl: MCP_WELL_KNOWN,
       authorizationServer: OAUTH_ISSUER,
@@ -304,14 +342,12 @@ export async function probeAndListMcpTools() {
 }
 
 /**
- * Calls a specific tool on https://mcp.smithery.ai/linpeiyun-emily via JSON-RPC tools/call
+ * Calls a tool on https://mcp.smithery.ai/linpeiyun-emily, matching either exact name or namespaced suffix.
  */
-export async function callSmitheryMcpTool(toolName, args = {}) {
+export async function callSmitheryMcpTool(targetToolSuffix, args = {}) {
   const token = getActiveToken();
   if (!token) {
-    throw new Error(
-      "Smithery MCP endpoint requires authentication. Click 'Authorize Smithery MCP' or provide a Bearer token."
-    );
+    throw new Error("Smithery MCP endpoint requires Bearer authorization.");
   }
 
   const headers = {
@@ -320,7 +356,6 @@ export async function callSmitheryMcpTool(toolName, args = {}) {
     Authorization: `Bearer ${token}`,
   };
 
-  // Initialize session first
   const initRes = await fetch(MCP_ENDPOINT, {
     method: "POST",
     headers,
@@ -345,6 +380,21 @@ export async function callSmitheryMcpTool(toolName, args = {}) {
     headers["mcp-session-id"] = sessionId;
   }
 
+  // Resolve exact tool name if tools were discovered with prefixes
+  let resolvedName = targetToolSuffix;
+  if (cachedDiscoveredTools.length > 0) {
+    const match = cachedDiscoveredTools.find(
+      (t) =>
+        t.name === targetToolSuffix ||
+        (t.name && t.name.endsWith(`_${targetToolSuffix}`)) ||
+        (t.name && t.name.endsWith(`/${targetToolSuffix}`)) ||
+        (t.name && t.name.includes(targetToolSuffix))
+    );
+    if (match?.name) {
+      resolvedName = match.name;
+    }
+  }
+
   const callRes = await fetch(MCP_ENDPOINT, {
     method: "POST",
     headers,
@@ -353,7 +403,7 @@ export async function callSmitheryMcpTool(toolName, args = {}) {
       id: Date.now(),
       method: "tools/call",
       params: {
-        name: toolName,
+        name: resolvedName,
         arguments: args,
       },
     }),
@@ -361,9 +411,12 @@ export async function callSmitheryMcpTool(toolName, args = {}) {
 
   if (!callRes.ok) {
     const errText = await callRes.text();
-    throw new Error(`MCP tools/call (${toolName}) failed: HTTP ${callRes.status} ${errText}`);
+    throw new Error(`MCP tools/call (${resolvedName}) failed: HTTP ${callRes.status} ${errText}`);
   }
 
   const parsed = await parseMcpResponse(callRes);
+  if (parsed?.error) {
+    throw new Error(parsed.error.message || JSON.stringify(parsed.error));
+  }
   return parsed?.result || parsed;
 }
