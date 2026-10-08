@@ -179,7 +179,7 @@ export const CURATED_ITINERARIES: CuratedItinerary[] = [
         whyBest: "Bypasses crowded city bus lines (#205/#206) and delivers luggage directly to your machiya doorstep.",
       },
       {
-        mode: "Skyscanner Regional Air + Shinkansen Comparison",
+        mode: "Cross-Border Regional Air + Shinkansen Link",
         routeSummary: "Seoul Gimpo (GMP) → Osaka Kansai (KIX) morning shuttle + Haruka Green Car",
         duration: "3h 15m cross-border link",
         referenceCostUsd: 165,
@@ -197,7 +197,7 @@ export const CURATED_ITINERARIES: CuratedItinerary[] = [
       reviewCount: 84,
       architecturalHighlight: "Private tsubo-niwa moss garden, cypress soaking bath, and heated floor tatami study.",
       structuredJsonPreview: {
-        provider: "Airbnb MCP Server Schema (Simulated Reference)",
+        provider: "Curated Heritage Stay Reference (Simulated)",
         listing_id: "kyoto-machiya-88219",
         instant_book: false,
         host_verification: "Superhost · Local Architect",
@@ -308,7 +308,7 @@ export const CURATED_ITINERARIES: CuratedItinerary[] = [
         whyBest: "Avoids steep cobblestone stairs with luggage and drops you right at your hanok courtyard gate.",
       },
       {
-        mode: "Skyscanner Gimpo–Haneda / Kansai Shuttle",
+        mode: "Gimpo–Haneda / Kansai City-Center Express Shuttle",
         routeSummary: "Seoul Gimpo (GMP) → Tokyo Haneda (HND) city-center express corridor",
         duration: "2h 10m flight",
         referenceCostUsd: 178,
@@ -326,7 +326,7 @@ export const CURATED_ITINERARIES: CuratedItinerary[] = [
       reviewCount: 67,
       architecturalHighlight: "Traditional heated ondol floors, private granite courtyard bath, and view of Inwangsan granite peaks.",
       structuredJsonPreview: {
-        provider: "Airbnb MCP Server Schema (Simulated Reference)",
+        provider: "Curated Heritage Stay Reference (Simulated)",
         listing_id: "seoul-seochon-44910",
         instant_book: false,
         host_verification: "Superhost · Heritage Preservationist",
@@ -438,7 +438,7 @@ export const CURATED_ITINERARIES: CuratedItinerary[] = [
       reviewCount: 52,
       architecturalHighlight: "Natural river-stone rotenburo fed by undisturbed volcanic spring, cantilevered over crimson maple ravine.",
       structuredJsonPreview: {
-        provider: "Airbnb MCP Server Schema (Simulated Reference)",
+        provider: "Curated Heritage Stay Reference (Simulated)",
         listing_id: "nagano-onsen-77102",
         instant_book: false,
         host_verification: "Third-Generation Ryokan Keeper",
@@ -508,7 +508,7 @@ export const CURATED_ITINERARIES: CuratedItinerary[] = [
     ],
     transportRoutes: [
       {
-        mode: "Skyscanner Regional Hop + Private EV SUV",
+        mode: "Regional Air Hop + Private EV SUV",
         routeSummary: "Seoul Gimpo (GMP) or Busan (PUS) → Jeju (CJU) + Dedicated Hyundai IONIQ 5 Coastal Driver",
         duration: "1h 10m flight + 40m coastal drive",
         referenceCostUsd: 115,
@@ -526,7 +526,7 @@ export const CURATED_ITINERARIES: CuratedItinerary[] = [
       reviewCount: 91,
       architecturalHighlight: "Walled black basalt garden with outdoor volcanic rock bath and tangerine orchard views.",
       structuredJsonPreview: {
-        provider: "Airbnb MCP Server Schema (Simulated Reference)",
+        provider: "Curated Heritage Stay Reference (Simulated)",
         listing_id: "jeju-basalt-33019",
         instant_book: false,
         host_verification: "Superhost · Jeju Island Native",
