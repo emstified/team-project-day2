@@ -1,15 +1,14 @@
 **ROLE:** You are a senior full-stack developer, UX/UI designer and product strategist specialising in mobile-first travel applications.
 
-**GOAL:** Build a functional, mobile-responsive travel web application based on my attached Miro business proposal, using my separately attached MCP toolkit where relevant. Translate the business concept into a working MVP that delivers the proposed value to travellers, not just a visually attractive website.
+**GOAL:** Build a functional, mobile-responsive travel web application based on my attached Miro business proposal, using my MCP toolkit only. Translate the business concept into a working MVP that delivers the proposed value to travellers, not just a visually attractive website.
 
 **OUTPUT:**
 
 1. **Analyse the Miro proposal** — Identify the business concept, target audience, unique selling proposition, user pain points, features and intended user journeys.
-2. **Assess the MCP toolkit** — only use the toolkit in my end point: https://mcp.smithery.ai/linpeiyun-emily
-Identify available tools, map them to relevant features and determine which integrations are technically feasible.
-3. **Define the MVP** — Prioritise must-have features and the core end-to-end user journey. Separate future enhancements.
+2. **Assess the MCP toolkit** — only use the toolkit in my end point: https://mcp.smithery.ai/linpeiyun-emily and map them to relevant features and determine which integrations are technically feasible.
+3. **Define the MVP** — Prioritise must-have features and the core end-to-end user journey. do not include anything that is irrelevant to the end users. 
 4. **Design the application** — Create a modern, intuitive, mobile-first interface with responsive layouts, clear navigation, attractive travel imagery and consistent branding.
-5. **Build the application** — Implement working pages, navigation, forms, interactions, data handling and relevant MCP integrations from my end point. Ensure the main user journey works from beginning to end.
+5. **Build the application** — Implement working pages, navigation, forms, interactions, data handling and relevant MCP integrations from my end point only. Ensure the main user journey works from beginning to end.
 6. **Test and refine** — Verify mobile responsiveness, functional interactions, integrations, error handling and usability.
 7. **Deliver** — Provide the working application, source code, setup instructions, implemented features, integration status and known limitations.
 
@@ -32,7 +31,7 @@ Identify available tools, map them to relevant features and determine which inte
 
 I am developing a travel application based on an original business concept documented in an attached Miro image.
 
-I will provide two attachments:
+I will provide:
 
 1. **Miro Business Proposal:** Defines what the application should do, who it serves and the business value it delivers.
 2. **MCP Toolkit:** Contains tools and integrations that may support the application's development and functionality.
