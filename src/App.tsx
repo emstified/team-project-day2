@@ -44,10 +44,10 @@ export default function App() {
 
   const checkMcpAuthStatus = async () => {
     try {
-      const res = await fetch("/api/health.js");
+      const res = await fetch("/api/mcp.js");
       if (res.ok) {
         const data = await res.json();
-        setMcpAuthenticated(Boolean(data?.gateway?.authenticated));
+        setMcpAuthenticated(Boolean(data?.authenticated));
       }
     } catch (_e) {
       // ignore
@@ -233,12 +233,20 @@ export default function App() {
               </span>
             )}
             <a
+              href="/api/mcp.js"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-stone-900 underline underline-offset-4"
+            >
+              MCP Connection (/api/mcp.js)
+            </a>
+            <a
               href="/api/health.js"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-stone-900 underline underline-offset-4"
             >
-              MCP Health Monitor (/api/health.js)
+              MCP Health (/api/health.js)
             </a>
           </div>
         </div>
