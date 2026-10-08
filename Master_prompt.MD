@@ -34,7 +34,7 @@ I am developing a travel application based on an original business concept docum
 I will provide:
 
 1. **Miro Business Proposal:** Defines what the application should do, who it serves and the business value it delivers.
-2. **MCP Toolkit:** Contains tools and integrations that may support the application's development and functionality.
+2. **MCP Toolkit:** that contains tools and integrations that may support the application's development and functionality.
 
 The application is intended to be a working MVP that I can demonstrate to users and stakeholders to validate the business concept.
 
