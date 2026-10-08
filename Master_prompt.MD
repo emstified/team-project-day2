@@ -5,11 +5,11 @@
 **OUTPUT:**
 
 1. **Analyse the Miro proposal** — Identify the business concept, target audience, unique selling proposition, user pain points, features and intended user journeys.
-2. **Assess the MCP toolkit** — end point: https://mcp.smithery.ai/linpeiyun-emily
+2. **Assess the MCP toolkit** — only use the toolkit in my end point: https://mcp.smithery.ai/linpeiyun-emily
 Identify available tools, map them to relevant features and determine which integrations are technically feasible.
 3. **Define the MVP** — Prioritise must-have features and the core end-to-end user journey. Separate future enhancements.
 4. **Design the application** — Create a modern, intuitive, mobile-first interface with responsive layouts, clear navigation, attractive travel imagery and consistent branding.
-5. **Build the application** — Implement working pages, navigation, forms, interactions, data handling and relevant MCP integrations. Ensure the main user journey works from beginning to end.
+5. **Build the application** — Implement working pages, navigation, forms, interactions, data handling and relevant MCP integrations from my end point. Ensure the main user journey works from beginning to end.
 6. **Test and refine** — Verify mobile responsiveness, functional interactions, integrations, error handling and usability.
 7. **Deliver** — Provide the working application, source code, setup instructions, implemented features, integration status and known limitations.
 
